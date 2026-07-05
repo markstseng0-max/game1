@@ -1,0 +1,2854 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>競技場亂鬥</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #24414A;      /* 深藍綠：文字／邊框，取代原本的深紫，維持與新色盤足夠對比 */
+    --sun: #E5CB90;      /* 暖沙金：金幣、獎勵、強調色 */
+    --bubble: #458393;   /* 深藍綠：次要強調、輔助按鈕 */
+    --grass: #34A99D;    /* 青綠：HP、玩家、正向指示（同一色系＝「你」的識別色）*/
+    --panel: #FFF3C8;    /* 奶油白：面板底色 */
+    --sky-a: #34A99D;
+    --sky-b: #FFF3C8;
+    --coral: #E2685A;    /* 危險／敵人警示色，刻意跟主色盤區隔，維持辨識度 */
+    --grape: #5C6FA6;    /* 魔王／特殊武器用色，略調整貼近新色調 */
+    --player: #34A99D;
+
+    /* ---- 併入「漫畫貼紙風 UI Kit」的衍生 token：元件改吃這幾個共用變數，
+       之後要換整體風格（圓角大小／陰影深淺／字型）只需要改這裡 ---- */
+    --radius-pill: 30px;
+    --radius-card: 16px;
+    --border-w: 3px;
+    --shadow-btn: 3px 4px 0 var(--ink);
+    --shadow-btn-active: 1px 1px 0 var(--ink);
+    --font-display: "Baloo 2", "Microsoft JhengHei", sans-serif;
+    --font-body: "Nunito", "Microsoft JhengHei", "PingFang TC", sans-serif;
+  }
+  * {
+    margin: 0; padding: 0; box-sizing: border-box;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;      /* 關掉 iOS 長按彈出的「複製/選取」選單 */
+    -webkit-tap-highlight-color: transparent; /* 關掉點擊時的灰藍色高亮閃爍 */
+  }
+  html, body {
+    height: 100%;
+    overscroll-behavior: none;
+  }
+  html, body {
+    touch-action: none;      /* 整頁禁止捲動/縮放/雙指手勢，避免遊戲操作時誤觸瀏覽器手勢 */
+  }
+  body {
+    background: linear-gradient(160deg, #FFF3C8, #E5CB90 55%, #34A99D);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: "Nunito", "Microsoft JhengHei", "PingFang TC", sans-serif;
+    color: var(--ink);
+    overflow: hidden;
+    touch-action: none;
+  }
+  #app {
+    display: flex;
+    height: 100dvh;
+    width: 100vw;
+    overflow: hidden;
+  }
+  #wrap {
+    position: relative;
+    touch-action: none;
+    width: 100%;
+    height: 100%;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 50% 35%, var(--sky-b), var(--sky-a));
+    touch-action: none;
+    cursor: none; /* 遊戲畫面隱藏滑鼠游標，按鈕/選單維持各自的預設游標，不受影響 */
+  }
+
+  /* ---- Comic-sticker buttons（沿用 UI Kit 的 .btn 系統，button 元素預設也套用同一份樣式，
+       兩者共用同一組 token，換膚只需要改 :root）---- */
+  button, .btn {
+    font-family: var(--font-display);
+    background: linear-gradient(180deg, #FFF3C8, var(--sun));
+    border: var(--border-w) solid var(--ink);
+    padding: 10px 22px;
+    font-size: 16px;
+    font-weight: 700;
+    border-radius: var(--radius-pill);
+    color: var(--ink);
+    cursor: pointer;
+    box-shadow: var(--shadow-btn);
+    transition: transform .06s, box-shadow .06s;
+  }
+  button:active, .btn:active {
+    transform: translate(2px,3px);
+    box-shadow: var(--shadow-btn-active);
+  }
+  .btn.danger {
+    background: linear-gradient(180deg, #FFD9CF, var(--coral));
+    color: #fff;
+  }
+
+  /* ---- Corner icon buttons (float on top of canvas, no extra page space) ---- */
+  .iconBtn {
+    position: absolute;
+    top: 10px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    padding: 0;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 2px 3px 0 var(--ink);
+    z-index: 4;
+  }
+  .iconBtn:active { transform: translate(1px,2px); box-shadow: var(--shadow-btn-active); }
+  #levelBtn { left: 10px; background: linear-gradient(180deg,#fff,#DFF4F1); }
+  #shopBtn  { left: 58px; background: linear-gradient(180deg,#FFF3C8, var(--sun)); }
+  #settingsBtn { left: 106px; background: linear-gradient(180deg,#EDE7FF,#CFC2F5); }
+  #hud { right: 10px; }
+  #statChip { line-height: 1.5; }
+  #statChip .statRow { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+  .badge { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; border: 1.5px solid var(--ink); margin-right: 3px; vertical-align: middle; }
+  .badge.coin { background: var(--sun); }
+  .badge.diamond { background: #B7E4DD; }
+  #helpBtn { background: #fff !important; color: var(--ink) !important; }
+
+  /* ---- Logo badge：平常是純標題，在自由世界裡會變成「返回上一關」的按鈕 ---- */
+  #logo {
+    position: absolute;
+    top: 56px;
+    left: 10px;
+    font-family: "Baloo 2", sans-serif;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--ink);
+    background: rgba(255,255,255,0.75);
+    border: 2px solid var(--ink);
+    border-radius: 14px;
+    padding: 3px 10px;
+    z-index: 3;
+    cursor: pointer;
+  }
+  #logo:active { transform: translate(1px,2px); }
+  #logo.clickable { background: linear-gradient(180deg, #FFF3C8, var(--sun)); }
+
+  /* ---- HUD ---- */
+  #hud {
+    position: absolute;
+    top: 10px;
+    left: 170px;
+    right: 108px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    font-family: "Baloo 2", sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    pointer-events: none;
+    z-index: 3;
+    gap: 6px;
+  }
+  .hudChip {
+    background: rgba(255,255,255,0.85);
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    padding: 4px 8px;
+  }
+  #hpBarBg {
+    width: 110px;
+    height: 14px;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid var(--ink);
+  }
+  #hpBar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--grass), #8FE0D2);
+    width: 100%;
+    transition: width .15s;
+  }
+  #coinText { color: #8A6A2E; }
+  #diamondText { color: #2E7D8C; }
+
+  /* ---- Overlays (game over / level select / shop) ---- */
+  #overlay, #levelSelect, #shopScreen {
+    position: absolute;
+    inset: 0;
+    background: rgba(255,243,200,0.97);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    z-index: 5;
+  }
+  #overlay h2, #levelSelect h2, #shopScreen h2 {
+    font-family: "Baloo 2", sans-serif;
+    font-size: 30px;
+    margin-bottom: 8px;
+    color: var(--bubble);
+    -webkit-text-stroke: 1px var(--ink);
+  }
+  #overlay p { margin-bottom: 18px; color: var(--ink); font-weight: 700; }
+  #overlay .btnRow { display: flex; gap: 12px; }
+  .secondary, .btn.secondary {
+    background: #fff !important;
+    color: var(--ink) !important;
+  }
+
+  #levelSelect { padding: 20px; overflow-y: auto; touch-action: pan-y; }
+  #selectCoinDisplay { font-family:"Baloo 2",sans-serif; font-weight:800; color:#8A6A2E; margin-bottom: 12px; }
+  #levelGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 340px; }
+  .levelCard {
+    width: 72px;
+    height: 72px;
+    border-radius: var(--radius-card);
+    background: linear-gradient(160deg, var(--panel), var(--sun));
+    border: var(--border-w) solid var(--ink);
+    box-shadow: 2px 3px 0 var(--ink);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: "Baloo 2", sans-serif;
+    color: var(--ink);
+    transition: transform .1s;
+  }
+  .levelCard span.num { font-size: 20px; font-weight: 800; }
+  .levelCard:active { transform: translate(1px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  .levelCard.locked {
+    background: #E7DFC9;
+    color: #9B9078;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+  .levelCard.cleared {
+    border-color: var(--bubble);
+    background: linear-gradient(160deg, #CFEDE7, #9FDDCF);
+  }
+  .levelCard.boss:not(.locked) {
+    background: linear-gradient(160deg, #1F3A40, #458393);
+    border-color: #E2685A;
+    color: #fff;
+    box-shadow: 2px 3px 0 #E2685A;
+  }
+
+  #shopScreen { padding: 22px 16px; overflow-y: auto; touch-action: pan-y; }
+  #shopCoinDisplay { font-family:"Baloo 2",sans-serif; font-size: 16px; margin-bottom: 14px; color: #8A6A2E; font-weight: 800; }
+  .shopGrid { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 340px; }
+  #shopTabs { display: flex; gap: 8px; width: 100%; max-width: 340px; margin-bottom: 14px; }
+  .shopTabBtn { flex: 1; padding: 8px 6px; font-size: 13px; }
+  .shopTabBtn.active { background: linear-gradient(180deg, var(--panel), var(--sun)) !important; color: var(--ink) !important; }
+  .weaponCard {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: #fff;
+    border: var(--border-w) solid var(--ink);
+    border-radius: var(--radius-card);
+    padding: 10px 14px;
+    text-align: left;
+    box-shadow: 2px 3px 0 var(--ink);
+  }
+  .weaponCard.equipped { background: linear-gradient(160deg, var(--panel), var(--sun)); }
+  .wName { font-family: "Baloo 2", sans-serif; font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+  .wDesc { font-size: 12px; color: #5C6E72; }
+  .wBtn { flex-shrink: 0; padding: 8px 12px; font-size: 12px; border-radius: var(--radius-card); box-shadow: var(--shadow-btn); }
+  .wBtn:disabled {
+    background: #E7DFC9 !important;
+    color: #9B9078;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+  #shopScreen .secondary { margin-top: 16px; }
+
+  /* 屬性強化的格子升級卡片：跟武器卡同一套邊框/陰影語言，但改成上方標題＋下方一整排「格子」的版型，
+     每一格代表一個可購買的等級，一眼就能看出目前練到哪、下一格要多少錢，符合手遊常見的升級節奏感 */
+  .upgCard {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #fff;
+    border: var(--border-w) solid var(--ink);
+    border-radius: var(--radius-card);
+    padding: 10px 14px 12px;
+    text-align: left;
+    box-shadow: 2px 3px 0 var(--ink);
+  }
+  .upgHead { display: flex; align-items: center; gap: 8px; }
+  .upgHead .upgIcon { flex-shrink: 0; width: 22px; height: 22px; display:flex; align-items:center; justify-content:center; }
+  .upgHead .upgTextWrap { flex: 1; min-width: 0; }
+  .upgCells { display: flex; gap: 6px; flex-wrap: wrap; }
+  .upgCell {
+    flex: 1;
+    min-width: 40px;
+    height: 34px;
+    border-radius: 8px;
+    border: 2px solid var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: "Baloo 2", sans-serif;
+  }
+  .upgCell.done { background: linear-gradient(160deg, var(--panel), var(--sun)); }
+  .upgCell.next { background: #fff; color: var(--ink); box-shadow: 1px 2px 0 var(--ink); cursor: pointer; }
+  .upgCell.next.disabled { opacity: 0.45; cursor: not-allowed; }
+  .upgCell.locked { background: #EFEAE0; border-style: dashed; border-color: #B9AF9A; color: #B9AF9A; }
+  .upgCell.maxed { background: linear-gradient(160deg, var(--sun), var(--coral)); color: #fff; }
+
+
+  /* ---- Touch controls ---- */
+  #joy {
+    position: absolute;
+    bottom: 18px;
+    left: 18px;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(190,234,226,0.75), rgba(69,131,147,0.3));
+    border: 3px solid var(--ink);
+    box-shadow: 2px 4px 0 rgba(36,65,74,0.35);
+    display: flex;
+    z-index: 3;
+    touch-action: none;
+  }
+  #joyStick {
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #BEEAE2, var(--bubble));
+    border: 2px solid var(--ink);
+    top: 26px;
+    left: 26px;
+    box-shadow: 1px 2px 0 rgba(36,65,74,0.4);
+  }
+  /* 拖曳時完全不套用 transition，避免跟即時位置更新打架造成延遲、卡頓感；
+     只有在放開手指、搖桿彈回中心點時才短暫加上平滑動畫（見下方 .snap） */
+  #joyStick.snap, #atkKnob.snap {
+    transition: left .12s cubic-bezier(.34,1.56,.64,1), top .12s cubic-bezier(.34,1.56,.64,1);
+  }
+  #atkPad {
+    position: absolute;
+    bottom: 18px;
+    right: 18px;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,205,150,0.75), rgba(226,104,90,0.3));
+    border: 3px solid var(--ink);
+    box-shadow: 2px 4px 0 rgba(36,65,74,0.35);
+    display: flex;
+    z-index: 3;
+    touch-action: none;
+  }
+  #atkKnob {
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #F3A98F, var(--coral));
+    border: 2px solid var(--ink);
+    top: 26px;
+    left: 26px;
+    box-shadow: 1px 2px 0 rgba(36,65,74,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 20px;
+  }
+  #atkPad.pressed #atkKnob {
+    transform: scale(1.08);
+  }
+
+  #settingsBackdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(20,34,38,0.6);
+    z-index: 6;
+    display: none;
+  }
+  #joy.aboveDim, #atkPad.aboveDim { z-index: 8; }
+
+  /* ---- 窄螢幕（例如 iPhone SE，寬度 ≤380px）：圖示與間距一起縮小，
+     避免血條/分數欄被右移的三顆圖示按鈕擠壓變形或換行 ---- */
+  @media (max-width: 380px) {
+    .iconBtn { width: 34px; height: 34px; top: 8px; }
+    #levelBtn { left: 8px; }
+    #shopBtn { left: 48px; }
+    #settingsBtn { left: 88px; }
+    #hud { left: 132px; right: 92px; top: 8px; font-size: 12px; }
+    #hpBarBg { width: 84px; }
+    #logo { top: 48px; font-size: 11px; padding: 2px 8px; }
+  }
+
+  /* ---- Settings panel ---- */
+  #settingsPanel {
+    position: absolute;
+    top: 58px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(300px, 88%);
+    background: rgba(255,243,200,0.97);
+    border: var(--border-w) solid var(--ink);
+    border-radius: var(--radius-card);
+    box-shadow: 3px 4px 0 var(--ink);
+    padding: 16px 18px;
+    z-index: 7;
+    display: none;
+    flex-direction: column;
+    gap: 14px;
+  }
+  #settingsPanel h3 {
+    font-family: "Baloo 2", sans-serif;
+    font-size: 18px;
+    color: var(--ink);
+    margin: 0;
+    text-align: center;
+  }
+  .settingRow { display: flex; flex-direction: column; gap: 4px; }
+  .settingRow label { font-size: 13px; font-weight: 700; color: var(--ink); display: flex; justify-content: space-between; }
+  .settingRow input[type="range"] { width: 100%; accent-color: var(--coral); }
+  #settingsPanel .btnRow { display: flex; gap: 10px; }
+  #settingsPanel .btnRow button { flex: 1; font-size: 13px; padding: 9px 6px; }
+  #dragModeBtn.active { background: linear-gradient(180deg, var(--coral), #C9463A) !important; color: #fff !important; }
+  #settingsHint { font-size: 12px; color: #5C6E72; text-align: center; line-height: 1.5; }
+
+  /* 拖曳調整位置模式：搖桿與攻擊鍵加上跳動的虛線提示框，並可直接拖曳整個底座移動 */
+  #joy.dragMode, #atkPad.dragMode {
+    outline: 3px dashed var(--ink);
+    outline-offset: 4px;
+    animation: dragPulse 1s ease-in-out infinite;
+  }
+  @keyframes dragPulse {
+    0%, 100% { outline-color: var(--ink); }
+    50% { outline-color: var(--coral); }
+  }
+
+  /* ---- Help tooltip ---- */
+  #tip {
+    position: absolute;
+    inset: 0;
+    background: rgba(36,65,74,0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 8;
+    padding: 24px;
+    overflow-y: auto;
+    touch-action: pan-y;
+  }
+  #tip p {
+    background: var(--panel);
+    border: 3px solid var(--ink);
+    border-radius: 16px;
+    padding: 16px 18px;
+    font-size: 13px;
+    line-height: 1.6;
+    font-weight: 700;
+    max-width: 320px;
+    margin: auto;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+<div id="wrap">
+  <canvas id="game" width="640" height="480"></canvas>
+  <div id="logo"><svg viewBox="0 0 24 24" width="13" height="13" style="vertical-align:-2px"><g transform="rotate(45 12 12)"><rect x="10.4" y="1.5" width="3.2" height="13" rx="1.3" fill="#fff" stroke="var(--ink)" stroke-width="1.6"/><rect x="6.8" y="14.2" width="10.4" height="2.6" rx="1" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.4"/><rect x="10.6" y="16.5" width="2.8" height="4.6" rx="1.1" fill="var(--ink)"/><circle cx="12" cy="21.6" r="1.6" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.2"/></g></svg> 競技場亂鬥</div>
+  <button id="levelBtn" class="iconBtn" title="選關卡">
+    <svg viewBox="0 0 24 24" width="18" height="18">
+      <rect x="3" y="5" width="18" height="3.4" rx="1.7" fill="var(--ink)"/>
+      <rect x="3" y="10.3" width="18" height="3.4" rx="1.7" fill="var(--ink)"/>
+      <rect x="3" y="15.6" width="18" height="3.4" rx="1.7" fill="var(--ink)"/>
+    </svg>
+  </button>
+  <button id="shopBtn" class="iconBtn" title="商店">
+    <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 4.5h2.2l2.3 11.2a2 2 0 0 0 2 1.6h7.3a2 2 0 0 0 1.96-1.62L20 8.2H6.3" fill="var(--sun)"/>
+      <circle cx="9.6" cy="20" r="1.5" fill="var(--ink)" stroke="none"/>
+      <circle cx="16.8" cy="20" r="1.5" fill="var(--ink)" stroke="none"/>
+    </svg>
+  </button>
+  <button id="settingsBtn" class="iconBtn" title="操作設定">
+    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3.2" fill="var(--panel)"/>
+      <path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7 5.6 5.6"/>
+    </svg>
+  </button>
+  <div id="hud">
+    <div class="hudChip">
+      <svg viewBox="0 0 24 24" width="14" height="14">
+        <path d="M12 21s-7.4-4.6-9.9-9.3C0.4 8.7 2 5.1 5.5 5.1c2 0 3.4 1 4.5 2.5 1-1.5 2.4-2.5 4.4-2.5 3.5 0 5.1 3.6 3.4 6.6C19.4 16.4 12 21 12 21z" fill="var(--coral)" stroke="var(--ink)" stroke-width="1.8" stroke-linejoin="round"/>
+      </svg>
+      <div id="hpBarBg"><div id="hpBar"></div></div>
+    </div>
+    <div class="hudChip" id="statChip" style="text-align:right;">
+      <div id="levelLine">第 <span id="levelNumText">1</span> 關 · <span id="progressText">擊殺 0/10</span></div>
+      <div id="scoreText">分數：0</div>
+      <div class="statRow">
+        <span class="badge coin"><svg viewBox="0 0 24 24" width="10" height="10"><circle cx="12" cy="12" r="8.4" fill="none" stroke="var(--ink)" stroke-width="2.8"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="var(--ink)" stroke-width="1.6"/></svg></span><span id="coinText">0</span> &nbsp; <span class="badge diamond"><svg viewBox="0 0 24 24" width="10" height="10"><path d="M12 4 L19 10 L12 20 L5 10 Z" fill="none" stroke="var(--ink)" stroke-width="2.4" stroke-linejoin="round"/></svg></span><span id="diamondText">0</span>
+      </div>
+    </div>
+  </div>
+  <div id="overlay">
+    <h2 id="overTitle">遊戲結束</h2>
+    <p id="overDesc">你撐過了 0 波，得到 0 分</p>
+    <div class="btnRow">
+      <button id="primaryBtn" class="btn">再玩一次</button>
+      <button id="selectBtn" class="secondary">返回選關</button>
+    </div>
+  </div>
+  <div id="levelSelect">
+    <h2>選擇關卡</h2>
+    <div id="selectCoinDisplay"><svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px"><circle cx="12" cy="12" r="8.4" fill="var(--sun)" stroke="var(--ink)" stroke-width="2.4"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="var(--ink)" stroke-width="1.5"/></svg> 0</div>
+    <div id="levelGrid"></div>
+    <button id="freeWorldBtn" class="secondary" style="margin-top:16px; background:linear-gradient(180deg,#DFFFE6,#CDEAD8) !important;"><svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--ink)" stroke-width="1.8"/><ellipse cx="12" cy="12" rx="4" ry="9" fill="none" stroke="var(--ink)" stroke-width="1.6"/><path d="M3.5 9h17M3.5 15h17" stroke="var(--ink)" stroke-width="1.6"/></svg> 自由世界（自由探索）</button>
+    <button id="goShopBtn" class="secondary" style="margin-top:10px;"><svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px"><path d="M3 4.5h2.2l2.3 11.2a2 2 0 0 0 2 1.6h7.3a2 2 0 0 0 1.96-1.62L20 8.2H6.3" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.6" cy="20" r="1.5" fill="var(--ink)"/><circle cx="16.8" cy="20" r="1.5" fill="var(--ink)"/></svg> 前往商店</button>
+    <div style="display:flex; gap:10px; margin-top:10px; width:100%; max-width:340px;">
+      <button id="helpBtn" class="secondary" style="flex:1;" title="操作說明"><svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px"><circle cx="12" cy="12" r="9.5" fill="#fff" stroke="var(--coral)" stroke-width="1.8"/><text x="12" y="16.5" font-size="11" font-weight="800" text-anchor="middle" fill="var(--coral)">?</text></svg> 操作說明</button>
+      <button id="openSettingsFromMenuBtn" class="secondary" style="flex:1;" title="操作設定"><svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px" fill="none" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2" fill="var(--panel)"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7 5.6 5.6"/></svg> 操作設定</button>
+    </div>
+    <div style="display:flex; gap:10px; margin-top:10px; width:100%; max-width:340px;">
+      <button id="deleteSaveBtn" class="btn danger" style="flex:1;" title="刪除存檔"><svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px"><path d="M5 6h14M9 6V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V6M7 6l1 14.5A1.5 1.5 0 0 0 9.5 22h5a1.5 1.5 0 0 0 1.5-1.5L17 6" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> 刪除存檔</button>
+    </div>
+  </div>
+  <div id="shopScreen">
+    <h2><svg viewBox="0 0 24 24" width="20" height="20" style="vertical-align:-4px"><path d="M3 4.5h2.2l2.3 11.2a2 2 0 0 0 2 1.6h7.3a2 2 0 0 0 1.96-1.62L20 8.2H6.3" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.6" cy="20" r="1.5" fill="var(--ink)"/><circle cx="16.8" cy="20" r="1.5" fill="var(--ink)"/></svg> 商店</h2>
+    <div id="shopCoinDisplay"><svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px"><circle cx="12" cy="12" r="8.4" fill="var(--sun)" stroke="var(--ink)" stroke-width="2.4"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="var(--ink)" stroke-width="1.5"/></svg> 0</div>
+    <div id="shopTabs">
+      <button id="tabWeapon" class="shopTabBtn secondary">武器</button>
+      <button id="tabUpgrade" class="shopTabBtn secondary">升級</button>
+      <button id="tabSkin" class="shopTabBtn secondary">造型</button>
+    </div>
+    <div id="weaponGrid" class="shopGrid"></div>
+    <div id="upgradeGrid" class="shopGrid" style="display:none;"></div>
+    <div id="skinGrid" class="shopGrid" style="display:none;"></div>
+    <button id="closeShopBtn" class="secondary">返回選關</button>
+  </div>
+  <div id="settingsBackdrop"></div>
+  <div id="settingsPanel">
+    <h3>操作設定</h3>
+    <div class="settingRow">
+      <label>移動搖桿大小 <span id="joySizeVal">96</span>px</label>
+      <input type="range" id="joySizeSlider" min="70" max="140" step="2" value="96">
+    </div>
+    <div class="settingRow">
+      <label>攻擊鍵大小 <span id="atkSizeVal">96</span>px</label>
+      <input type="range" id="atkSizeSlider" min="70" max="140" step="2" value="96">
+    </div>
+    <button id="dragModeBtn" class="secondary">拖曳調整位置</button>
+    <div id="settingsHint">開啟後，直接在畫面上拖曳搖桿或攻擊鍵的底座到你想要的位置</div>
+    <div class="btnRow">
+      <button id="resetCtrlBtn" class="secondary">重置預設</button>
+      <button id="doneCtrlBtn" class="btn">完成</button>
+    </div>
+  </div>
+  <div id="tip"><p>電腦：WASD／方向鍵或左下角搖桿移動；按住滑鼠左鍵（或空白鍵）開始攻擊——按著不動會自動鎖定最近的敵人，按住並移動滑鼠則改成手動瞄準，方向跟著滑鼠移動的方向走，放開就停止攻擊<br><br>手機：左下搖桿移動；右下角攻擊鍵——點著不拖曳會自動鎖定最近的敵人開火，拖曳出方向則改成手動瞄準該方向，放開就停止攻擊<br><br>商店可用金幣購買武器、強化體力上限，也能用自由世界賺到的鑽石購買限定造型<br><br>自由世界：會刷怪，分數達標可獲得鑽石，隨時點左上角關卡圖示離開<br><br>（點任意處關閉）</p></div>
+  <div id="joy"><div id="joyStick"></div></div>
+  <div id="atkPad"><div id="atkKnob">
+    <svg viewBox="0 0 24 24" width="20" height="20">
+      <g transform="rotate(45 12 12)">
+        <rect x="10.4" y="1.5" width="3.2" height="13" rx="1.3" fill="#fff" stroke="var(--ink)" stroke-width="1.6"/>
+        <rect x="6.8" y="14.2" width="10.4" height="2.6" rx="1" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.4"/>
+        <rect x="10.6" y="16.5" width="2.8" height="4.6" rx="1.1" fill="var(--ink)"/>
+        <circle cx="12" cy="21.6" r="1.6" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.2"/>
+      </g>
+    </svg>
+  </div></div>
+</div>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W = canvas.width, H = canvas.height;
+const isTouch = 'ontouchstart' in window;
+
+// ---- 圖示庫：取代原本散落各處的 iOS 表情符號（金幣、鑽石、地球、購物車、問號、劍、皇冠、獎盃、勾勾），
+// 全部改用跟 UI Kit 一致的手繪線條 SVG，風格才會統一、也不受系統表情符號字型影響 ----
+const ICONS = {
+  coin: '<svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px"><circle cx="12" cy="12" r="8.4" fill="var(--sun)" stroke="var(--ink)" stroke-width="2.4"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="var(--ink)" stroke-width="1.5"/></svg>',
+  diamond: '<svg viewBox="0 0 24 24" width="13" height="13" style="vertical-align:-2px"><path d="M12 4 L19 10 L12 20 L5 10 Z" fill="#B7E4DD" stroke="var(--ink)" stroke-width="2.2" stroke-linejoin="round"/></svg>',
+  globe: '<svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--ink)" stroke-width="1.8"/><ellipse cx="12" cy="12" rx="4" ry="9" fill="none" stroke="var(--ink)" stroke-width="1.6"/><path d="M3.5 9h17M3.5 15h17" stroke="var(--ink)" stroke-width="1.6"/></svg>',
+  cart: '<svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px"><path d="M3 4.5h2.2l2.3 11.2a2 2 0 0 0 2 1.6h7.3a2 2 0 0 0 1.96-1.62L20 8.2H6.3" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.6" cy="20" r="1.5" fill="var(--ink)"/><circle cx="16.8" cy="20" r="1.5" fill="var(--ink)"/></svg>',
+  help: '<svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px"><circle cx="12" cy="12" r="9.5" fill="#fff" stroke="var(--coral)" stroke-width="1.8"/><text x="12" y="16.5" font-size="11" font-weight="800" text-anchor="middle" fill="var(--coral)">?</text></svg>',
+  sword: '<svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px"><g transform="rotate(45 12 12)"><rect x="10.4" y="1.5" width="3.2" height="13" rx="1.3" fill="#fff" stroke="var(--ink)" stroke-width="1.6"/><rect x="6.8" y="14.2" width="10.4" height="2.6" rx="1" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.4"/><rect x="10.6" y="16.5" width="2.8" height="4.6" rx="1.1" fill="var(--ink)"/><circle cx="12" cy="21.6" r="1.6" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.2"/></g></svg>',
+  back: '<svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px"><path d="M14 6 L7 12 L14 18" fill="none" stroke="var(--ink)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 12h11" stroke="var(--ink)" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  crown: '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px"><path d="M4 18 L3 8 L8 12 L12 5 L16 12 L21 8 L20 18 Z" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+  trophy: '<svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-3px"><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 5H4v2a4 4 0 0 0 4 4M17 5h3v2a4 4 0 0 1-4 4" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-linecap="round"/><path d="M12 14v3M9 20h6M9.5 20c0-2 .8-2.6 2.5-3 1.7.4 2.5 1 2.5 3" fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  check: '<svg viewBox="0 0 24 24" width="13" height="13" style="vertical-align:-2px"><path d="M4 12.5 L9.5 18 L20 6" fill="none" stroke="var(--grass)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px"><path d="M12 21.5 C12 21.5 5.5 14.8 5.5 9.6 A6.5 6.5 0 0 1 18.5 9.6 C18.5 14.8 12 21.5 12 21.5 Z" fill="var(--coral)" stroke="var(--ink)" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="9.4" r="2.6" fill="#fff" stroke="var(--ink)" stroke-width="1.4"/></svg>',
+};
+
+// ---- 音效與震動回饋：用 WebAudio 即時合成短音效，不需要外部音檔 ----
+let audioCtx = null;
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* 不支援就靜音 */ }
+  } else if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+function beep(freq, duration, type = 'sine', volume = 0.15) {
+  const ac = ensureAudioCtx();
+  if (!ac) return;
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.value = volume;
+  gain.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.start();
+  osc.stop(ac.currentTime + duration);
+}
+const sfx = {
+  hit:    () => beep(520, 0.06, 'square', 0.08),
+  kill:   () => beep(780, 0.09, 'square', 0.1),
+  hurt:   () => { beep(140, 0.15, 'sawtooth', 0.14); if (navigator.vibrate) navigator.vibrate(40); },
+  pickup: () => { beep(880, 0.08, 'sine', 0.12); setTimeout(() => beep(1200, 0.1, 'sine', 0.1), 60); },
+  clear:  () => { beep(660, 0.12, 'triangle', 0.15); setTimeout(() => beep(990, 0.18, 'triangle', 0.15), 120); },
+  over:   () => { beep(220, 0.25, 'sawtooth', 0.15); if (navigator.vibrate) navigator.vibrate([60,40,60]); },
+};
+// 大部分瀏覽器要求先有使用者互動才能播放音訊，第一次點擊/觸控時解鎖 AudioContext
+window.addEventListener('pointerdown', ensureAudioCtx, { once: true });
+
+let keys = {};
+let joyVec = { x: 0, y: 0 };
+
+// ---- 滿版全螢幕：畫布直接對齊目前視窗的實際寬高，不裁切固定比例、不置中留白，
+// 手機直的橫的、電腦視窗多寬多高都直接貼齊四個邊，跟 poxel.io 那種滿版風格一樣 ----
+function fitStage() {
+  const w = Math.round(window.innerWidth);
+  const h = Math.round(window.innerHeight);
+  canvas.width = w;
+  canvas.height = h;
+  W = w;
+  H = h;
+}
+window.addEventListener('resize', fitStage);
+window.addEventListener('orientationchange', fitStage);
+fitStage();
+
+// 防止拖曳搖桿/攻擊鍵時手指滑動被瀏覽器判定成「下拉更新」或橡皮筋回彈捲動；
+// 排除 #levelSelect / #shopScreen / #tip 這幾個本來就需要上下捲動的選單畫面，
+// 以及 #settingsPanel —— 面板裡的 <input type="range"> 滑桿要靠瀏覽器原生的觸控拖曳手勢才能運作，
+// 一旦這裡也被 preventDefault()，手指在滑桿上拖曳就完全沒反應（這正是滑桿拖不動的真正原因）。
+document.addEventListener('touchmove', e => {
+  if (e.target.closest('#levelSelect, #shopScreen, #tip, #settingsPanel')) return;
+  e.preventDefault();
+}, { passive: false });
+
+// 防止 iOS Safari 特有的雙指縮放手勢（touch-action 有時擋不住這個）與雙擊縮放
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('gesturechange', e => e.preventDefault());
+document.addEventListener('gestureend', e => e.preventDefault());
+let lastTouchEnd = 0;
+document.addEventListener('touchend', e => {
+  const now = Date.now();
+  if (now - lastTouchEnd <= 300) e.preventDefault(); // 攔截雙擊放大
+  lastTouchEnd = now;
+}, { passive: false });
+
+document.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if(e.key===' ') { atkHeld = true; e.preventDefault(); } });
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if(e.key===' ') { atkHeld = false; e.preventDefault(); } });
+// 滑鼠拖曳攻擊的邏輯改用 Pointer Lock 實作（見下方攻擊搖桿區塊），
+// 這裡不再用滑鼠的「絕對座標」來瞄準。
+
+// ---- 操作設定：搖桿／攻擊鍵的大小與位置，存在本機 localStorage（裝置專屬的 UI 偏好，
+// 不隨雲端存檔同步），開啟設定面板即可用滑桿調整大小、或用「拖曳調整位置」直接搬動底座。
+const wrap = document.getElementById('wrap');
+const CTRL_SETTINGS_KEY = 'arena_control_settings_v1';
+const CTRL_DEFAULTS = { joySize: 96, atkSize: 96, joyLeft: 18, joyBottom: 18, atkRight: 18, atkBottom: 18 };
+let ctrlSettings = Object.assign({}, CTRL_DEFAULTS);
+const KNOB_RATIO = 44 / 96;   // 搖桿/攻擊鍵「中心鈕」相對底座的大小比例，維持原本的視覺比例
+const MAXDIST_RATIO = 35 / 96; // 中心鈕可拖曳的最大距離相對底座大小的比例
+
+function loadCtrlSettings() {
+  try {
+    const raw = localStorage.getItem(CTRL_SETTINGS_KEY);
+    if (raw) Object.assign(ctrlSettings, JSON.parse(raw));
+  } catch (err) {}
+}
+function saveCtrlSettings() {
+  try { localStorage.setItem(CTRL_SETTINGS_KEY, JSON.stringify(ctrlSettings)); } catch (err) {}
+}
+
+let JOY_OFFSET = 26, JOY_MAXDIST = 35, ATK_OFFSET = 26, ATK_MAXDIST = 35;
+function applyCtrlSettings() {
+  joy.style.width = ctrlSettings.joySize + 'px';
+  joy.style.height = ctrlSettings.joySize + 'px';
+  joy.style.left = ctrlSettings.joyLeft + 'px';
+  joy.style.bottom = ctrlSettings.joyBottom + 'px';
+  joy.style.right = 'auto';
+  joy.style.top = 'auto';
+  const jKnob = Math.round(ctrlSettings.joySize * KNOB_RATIO);
+  joyStick.style.width = jKnob + 'px';
+  joyStick.style.height = jKnob + 'px';
+  JOY_OFFSET = Math.round((ctrlSettings.joySize - jKnob) / 2);
+  JOY_MAXDIST = Math.round(ctrlSettings.joySize * MAXDIST_RATIO);
+  if (joyPointerId === null) { joyStick.style.left = JOY_OFFSET + 'px'; joyStick.style.top = JOY_OFFSET + 'px'; }
+
+  atkPad.style.width = ctrlSettings.atkSize + 'px';
+  atkPad.style.height = ctrlSettings.atkSize + 'px';
+  atkPad.style.right = ctrlSettings.atkRight + 'px';
+  atkPad.style.bottom = ctrlSettings.atkBottom + 'px';
+  atkPad.style.left = 'auto';
+  atkPad.style.top = 'auto';
+  const aKnob = Math.round(ctrlSettings.atkSize * KNOB_RATIO);
+  atkKnob.style.width = aKnob + 'px';
+  atkKnob.style.height = aKnob + 'px';
+  ATK_OFFSET = Math.round((ctrlSettings.atkSize - aKnob) / 2);
+  ATK_MAXDIST = Math.round(ctrlSettings.atkSize * MAXDIST_RATIO);
+  if (atkPointerId === null) { atkKnob.style.left = ATK_OFFSET + 'px'; atkKnob.style.top = ATK_OFFSET + 'px'; }
+}
+
+// 拖曳調整底座「位置」用（跟拖曳中心鈕瞄準方向是兩回事）：開啟設定面板裡的「拖曳調整位置」
+// 後，joy/atkPad 底座本身變成可直接拖曳搬移，放開後換算回 left/bottom 或 right/bottom 存起來。
+let settingsMode = false;
+let dragTarget = null;   // 'joy' | 'atk' | null
+let dragPointerId = null;
+let dragStart = { x: 0, y: 0 };
+let dragElStart = { left: 0, top: 0 };
+
+function startPadDrag(which, e) {
+  dragTarget = which;
+  dragPointerId = e.pointerId;
+  const el = which === 'joy' ? joy : atkPad;
+  const wrapRect = wrap.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  dragStart = { x: e.clientX, y: e.clientY };
+  dragElStart = { left: elRect.left - wrapRect.left, top: elRect.top - wrapRect.top };
+  el.style.left = dragElStart.left + 'px';
+  el.style.top = dragElStart.top + 'px';
+  el.style.right = 'auto';
+  el.style.bottom = 'auto';
+  try { el.setPointerCapture(dragPointerId); } catch (err) {}
+  e.preventDefault();
+}
+function movePadDrag(e) {
+  if (e.pointerId !== dragPointerId || !dragTarget) return;
+  const el = dragTarget === 'joy' ? joy : atkPad;
+  const wrapRect = wrap.getBoundingClientRect();
+  let newLeft = dragElStart.left + (e.clientX - dragStart.x);
+  let newTop = dragElStart.top + (e.clientY - dragStart.y);
+  newLeft = Math.max(0, Math.min(wrapRect.width - el.offsetWidth, newLeft));
+  newTop = Math.max(0, Math.min(wrapRect.height - el.offsetHeight, newTop));
+  el.style.left = newLeft + 'px';
+  el.style.top = newTop + 'px';
+  e.preventDefault();
+}
+function endPadDrag(e) {
+  if (e.pointerId !== dragPointerId || !dragTarget) return;
+  const el = dragTarget === 'joy' ? joy : atkPad;
+  const wrapRect = wrap.getBoundingClientRect();
+  const left = parseFloat(el.style.left);
+  const top = parseFloat(el.style.top);
+  if (dragTarget === 'joy') {
+    ctrlSettings.joyLeft = Math.round(left);
+    ctrlSettings.joyBottom = Math.round(wrapRect.height - top - el.offsetHeight);
+  } else {
+    ctrlSettings.atkRight = Math.round(wrapRect.width - left - el.offsetWidth);
+    ctrlSettings.atkBottom = Math.round(wrapRect.height - top - el.offsetHeight);
+  }
+  saveCtrlSettings();
+  dragTarget = null;
+  dragPointerId = null;
+  applyCtrlSettings();
+}
+
+// Movement joystick — always visible, and driven by the Pointer Events API so it
+// works identically for mouse drag (desktop), touch, and pen, each pointer tracked
+// by its own pointerId. This keeps it fully independent from the attack button:
+// holding the attack button (a separate element/pointer) can never block dragging the joystick.
+const joy = document.getElementById('joy');
+const joyStick = document.getElementById('joyStick');
+let joyPointerId = null;
+let joyOrigin = { x: 0, y: 0 };
+
+function joyPointerDown(e) {
+  if (settingsMode) { startPadDrag('joy', e); return; } // 設定模式：拖曳的是整個底座的位置，不是搖桿方向
+  if (joyPointerId !== null) return; // 已有其他指標在操作搖桿
+  joyPointerId = e.pointerId;
+  joyOrigin = { x: e.clientX, y: e.clientY };
+  joyStick.classList.remove('snap'); // 拿掉回彈動畫，讓拖曳期間的位置更新是即時的，不會卡卡的
+  try { joy.setPointerCapture(joyPointerId); } catch (err) {}
+  e.preventDefault();
+}
+function joyPointerMove(e) {
+  if (dragTarget === 'joy') { movePadDrag(e); return; }
+  if (e.pointerId !== joyPointerId) return;
+  const dx = e.clientX - joyOrigin.x;
+  const dy = e.clientY - joyOrigin.y;
+  const dist = Math.min(JOY_MAXDIST, Math.hypot(dx, dy));
+  const ang = Math.atan2(dy, dx);
+  joyVec.x = Math.cos(ang) * (dist/JOY_MAXDIST);
+  joyVec.y = Math.sin(ang) * (dist/JOY_MAXDIST);
+  joyStick.style.left = (JOY_OFFSET + Math.cos(ang)*dist) + 'px';
+  joyStick.style.top = (JOY_OFFSET + Math.sin(ang)*dist) + 'px';
+  e.preventDefault();
+}
+function joyPointerUp(e) {
+  if (dragTarget === 'joy') { endPadDrag(e); return; }
+  if (e.pointerId !== joyPointerId) return;
+  joyPointerId = null;
+  joyVec.x = 0; joyVec.y = 0;
+  joyStick.classList.add('snap'); // 放開時才用短暫動畫讓搖桿彈回中心，感覺更有回饋、不生硬
+  joyStick.style.left = JOY_OFFSET + 'px';
+  joyStick.style.top = JOY_OFFSET + 'px';
+}
+joy.addEventListener('pointerdown', joyPointerDown);
+joy.addEventListener('pointermove', joyPointerMove);
+joy.addEventListener('pointerup', joyPointerUp);
+joy.addEventListener('pointercancel', joyPointerUp);
+
+// Attack stick (Brawl Stars 風格)：拖曳決定攻擊方向，放開才停止攻擊。
+// 完全手動控制——沒有自動瞄準最近敵人，也不會自動開火，必須主動按著／拖著才會攻擊。
+const atkPad = document.getElementById('atkPad');
+const atkKnob = document.getElementById('atkKnob');
+let atkPointerId = null;
+let atkOrigin = { x: 0, y: 0 };
+let atkHeld = false;   // 是否正按著攻擊搖桿（觸控／滑鼠皆可）
+let atkAiming = false;  // 拖曳距離是否足以判定方向（避免手指微抖就亂轉向）
+let atkAngle = 0;
+
+function atkPointerDown(e) {
+  if (settingsMode) { startPadDrag('atk', e); return; }
+  if (atkPointerId !== null) return;
+  atkPointerId = e.pointerId;
+  atkOrigin = { x: e.clientX, y: e.clientY };
+  atkHeld = true;
+  atkAiming = false;
+  atkKnob.classList.remove('snap'); // 同樣移除回彈動畫，確保拖曳當下反應即時
+  atkPad.classList.add('pressed');
+  try { atkPad.setPointerCapture(atkPointerId); } catch (err) {}
+  e.preventDefault();
+}
+function atkPointerMove(e) {
+  if (dragTarget === 'atk') { movePadDrag(e); return; }
+  if (e.pointerId !== atkPointerId) return;
+  const dx = e.clientX - atkOrigin.x;
+  const dy = e.clientY - atkOrigin.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist > 8) { // 超過一點點距離才視為「決定方向」，避免手指輕觸就誤判角度
+    atkAiming = true;
+    atkAngle = Math.atan2(dy, dx);
+  }
+  const clamped = Math.min(ATK_MAXDIST, dist);
+  const ang = Math.atan2(dy, dx);
+  atkKnob.style.left = (ATK_OFFSET + Math.cos(ang)*clamped) + 'px';
+  atkKnob.style.top = (ATK_OFFSET + Math.sin(ang)*clamped) + 'px';
+  e.preventDefault();
+}
+function atkPointerUp(e) {
+  if (dragTarget === 'atk') { endPadDrag(e); return; }
+  if (e.pointerId !== atkPointerId) return;
+  atkPointerId = null;
+  atkHeld = false;
+  atkAiming = false;
+  atkPad.classList.remove('pressed');
+  atkKnob.classList.add('snap');
+  atkKnob.style.left = ATK_OFFSET + 'px';
+  atkKnob.style.top = ATK_OFFSET + 'px';
+}
+atkPad.addEventListener('pointerdown', atkPointerDown);
+atkPad.addEventListener('pointermove', atkPointerMove);
+atkPad.addEventListener('pointerup', atkPointerUp);
+atkPad.addEventListener('pointercancel', atkPointerUp);
+
+// ---- 電腦滑鼠版攻擊：整個畫布都等同攻擊鍵搖桿。
+// 按下滑鼠當下視為「滑鼠已經定位在攻擊鍵上」（游標本來就隱藏看不到），
+// 之後滑鼠的「移動量」直接等於攻擊鍵搖桿的位移，用 Pointer Lock 取得不受螢幕邊界限制的相對移動量。
+// 放開滑鼠＝放開攻擊鍵：停止攻擊、搖桿彈回中心。
+let mouseAtkDx = 0, mouseAtkDy = 0;
+function mouseAttackStart(e) {
+  if (settingsMode || isTouch || atkPointerId !== null) return; // 已有觸控在操作攻擊鍵時，滑鼠不重複介入
+  mouseAtkDx = 0; mouseAtkDy = 0;
+  atkHeld = true;
+  atkAiming = false;
+  atkKnob.classList.remove('snap');
+  atkPad.classList.add('pressed');
+  try { canvas.requestPointerLock(); } catch (err) {}
+}
+function mouseAttackEnd() {
+  if (isTouch) return;
+  if (!atkHeld) return;
+  atkHeld = false;
+  atkAiming = false;
+  mouseAtkDx = 0; mouseAtkDy = 0;
+  atkPad.classList.remove('pressed');
+  atkKnob.classList.add('snap');
+  atkKnob.style.left = ATK_OFFSET + 'px';
+  atkKnob.style.top = ATK_OFFSET + 'px';
+  if (document.pointerLockElement === canvas) { try { document.exitPointerLock(); } catch (err) {} }
+}
+canvas.addEventListener('mousedown', mouseAttackStart);
+window.addEventListener('mouseup', mouseAttackEnd);
+document.addEventListener('pointerlockchange', () => {
+  if (document.pointerLockElement !== canvas) mouseAttackEnd(); // 例如使用者按 Esc 被瀏覽器強制解鎖
+});
+document.addEventListener('mousemove', e => {
+  if (isTouch || document.pointerLockElement !== canvas) return;
+  mouseAtkDx += e.movementX;
+  mouseAtkDy += e.movementY;
+  const dist = Math.hypot(mouseAtkDx, mouseAtkDy);
+  if (dist > 8) {
+    atkAiming = true;
+    atkAngle = Math.atan2(mouseAtkDy, mouseAtkDx);
+  }
+  const clamped = Math.min(ATK_MAXDIST, dist);
+  const ang = Math.atan2(mouseAtkDy, mouseAtkDx);
+  atkKnob.style.left = (ATK_OFFSET + Math.cos(ang)*clamped) + 'px';
+  atkKnob.style.top = (ATK_OFFSET + Math.sin(ang)*clamped) + 'px';
+});
+
+// ---- 防呆保險：在 iframe 預覽等環境中，若滑鼠/手指是在攻擊鍵或搖桿範圍外放開，
+// setPointerCapture 有機會沒生效，導致 atkPad/joy 本身收不到 pointerup，
+// atkHeld/atkPointerId（或 joyVec/joyPointerId）就會卡住，變成角色一直自動攻擊、
+// 攻擊鍵也再按不出反應。這裡在 window 層級再補一層監聽，只要偵測到對應的 pointerId
+// 放開、或視窗整個失去焦點/指標離開視窗，就強制把狀態重置乾淨。
+function forceReleaseAtk() {
+  if (atkPointerId === null && !atkHeld) return;
+  atkPointerId = null;
+  atkHeld = false;
+  atkAiming = false;
+  atkPad.classList.remove('pressed');
+  atkKnob.classList.add('snap');
+  atkKnob.style.left = ATK_OFFSET + 'px';
+  atkKnob.style.top = ATK_OFFSET + 'px';
+}
+function forceReleaseJoy() {
+  if (joyPointerId === null && joyVec.x === 0 && joyVec.y === 0) return;
+  joyPointerId = null;
+  joyVec.x = 0; joyVec.y = 0;
+  joyStick.classList.add('snap');
+  joyStick.style.left = JOY_OFFSET + 'px';
+  joyStick.style.top = JOY_OFFSET + 'px';
+}
+window.addEventListener('pointerup', e => {
+  if (e.pointerId === atkPointerId) forceReleaseAtk();
+  if (e.pointerId === joyPointerId) forceReleaseJoy();
+});
+window.addEventListener('pointercancel', e => {
+  if (e.pointerId === atkPointerId) forceReleaseAtk();
+  if (e.pointerId === joyPointerId) forceReleaseJoy();
+});
+// 保底：只要滑鼠按鍵已經放開（e.buttons 為 0），或視窗失去焦點/指標離開視窗，
+// 不管有沒有拿到正確的 pointerId 都直接重置，避免任何漏接情況讓角色卡在攻擊中
+window.addEventListener('pointermove', e => { if (e.buttons === 0) { forceReleaseAtk(); forceReleaseJoy(); } });
+window.addEventListener('blur', () => { forceReleaseAtk(); forceReleaseJoy(); });
+document.addEventListener('mouseleave', () => { forceReleaseAtk(); forceReleaseJoy(); });
+
+// ---- Levels ----
+const LEVELS = [
+  { name: '新手試煉',   killTarget: 10, spawnInterval: 55, toughChance: 0.04, speedMul: 1.00, hpMul: 1.00, dmgMul: 1.00 },
+  { name: '混亂前哨',   killTarget: 15, spawnInterval: 48, toughChance: 0.07, speedMul: 1.05, hpMul: 1.10, dmgMul: 1.05 },
+  { name: '荒野突襲',   killTarget: 20, spawnInterval: 42, toughChance: 0.10, speedMul: 1.10, hpMul: 1.25, dmgMul: 1.10 },
+  { name: '血色競技場', killTarget: 25, spawnInterval: 37, toughChance: 0.14, speedMul: 1.15, hpMul: 1.40, dmgMul: 1.15 },
+  { name: '鋼鐵獸群',   killTarget: 30, spawnInterval: 32, toughChance: 0.18, speedMul: 1.20, hpMul: 1.60, dmgMul: 1.20 },
+  { name: '絕命風暴',   killTarget: 35, spawnInterval: 27, toughChance: 0.22, speedMul: 1.25, hpMul: 1.80, dmgMul: 1.30 },
+  { name: '深淵狂潮',   killTarget: 42, spawnInterval: 23, toughChance: 0.27, speedMul: 1.30, hpMul: 2.05, dmgMul: 1.40 },
+  { name: '終焉戰場',   killTarget: 50, spawnInterval: 19, toughChance: 0.32, speedMul: 1.35, hpMul: 2.35, dmgMul: 1.50 },
+  { name: '混沌深淵',   killTarget: 55, spawnInterval: 17, toughChance: 0.35, speedMul: 1.40, hpMul: 2.60, dmgMul: 1.60 },
+  { name: '熔岩競技場', killTarget: 60, spawnInterval: 15, toughChance: 0.38, speedMul: 1.45, hpMul: 2.90, dmgMul: 1.70 },
+  { name: '虛空裂隙',   killTarget: 65, spawnInterval: 13, toughChance: 0.42, speedMul: 1.50, hpMul: 3.20, dmgMul: 1.80 },
+  { name: '王者試煉',   killTarget: 75, spawnInterval: 11, toughChance: 0.46, speedMul: 1.55, hpMul: 3.60, dmgMul: 2.00 },
+  { name: '超級魔王：終焉裂界者', killTarget: 1, spawnInterval: 999999, toughChance: 0.30, speedMul: 1.40, hpMul: 1.80, dmgMul: 1.30, boss: true },
+];
+let currentLevel = 0;      // index into LEVELS
+let lastLevel = 0;         // 記住最近一次在玩的「普通關卡」，讓自由世界裡可以一鍵跳回去
+let unlockedLevel = 0;     // highest unlocked index
+
+// ---- Weapons & Coins ----
+// 每把武器只決定「打法形狀」（彈道、冷卻、貫穿基礎值），不再附帶被動加成——
+// 強度統一交給下面的「屬性強化」系統，武器跟強度兩條軸線分開，選武器不用再考慮劃算不划算。
+const WEAPONS = [
+  { id:'default', name:'制式手槍', desc:'單發直線攻擊，穩定可靠',           cost:0,   cooldown:10, pellets:1, spreadAngle:0,   pierce:0 },
+  { id:'spread',  name:'散彈槍',   desc:'一次射出3發，範圍更廣，適合近戰',   cost:150, cooldown:16, pellets:3, spreadAngle:0.5, pierce:0 },
+  { id:'rapid',   name:'速射槍',   desc:'冷卻大幅縮短，狂風暴雨般的火力',   cost:200, cooldown:5,  pellets:1, spreadAngle:0,   pierce:0 },
+  { id:'laser',   name:'貫穿砲', desc:'子彈可連續貫穿 2 隻敵人',         cost:250, cooldown:12, pellets:1, spreadAngle:0,   pierce:2 },
+  { id:'boomerang', name:'迴力刃', desc:'刀刃來回穿梭，帶有貫穿效果',       cost:320, cooldown:14, pellets:1, spreadAngle:0,   pierce:1 },
+  { id:'plasma',  name:'激光光束', desc:'瞬間射出強力光束，橫掃直線上所有敵人，蓄力較久', cost:400, cooldown:28, pellets:1, spreadAngle:0, pierce:0 },
+  { id:'shieldsword', name:'裂地護盾', desc:'原地揮出大範圍護盾衝擊，冷卻很長但傷害極高，完全不用瞄準的坦度近戰打法', cost:450, cooldown:70, pellets:0, spreadAngle:0, pierce:0 },
+];
+// ---- 屬性強化（金幣消耗，可重複升級）：原本「擁有武器就白送被動」的設計缺乏長線目標，
+// 現在把傷害／冷卻／貫穿／彈體全部改成要花錢買的獨立升級軸，跟武器本身（決定打法）脫鉤。
+// 武器選擇 = 你想怎麼打；屬性強化 = 你打得多強，兩者分開才能一直往後面的關卡延伸養成深度。
+const STAT_UPGRADES = {
+  dmg:        { name:'傷害強化',   unit:'傷害', icon:ICONS.sword,
+                levels:[{cost:400,add:1},{cost:750,add:1},{cost:1200,add:1},{cost:1800,add:1},{cost:2600,add:1},{cost:3600,add:1}] },
+  cdr:        { name:'冷卻縮短',   unit:'%',   icon:ICONS.globe,
+                levels:[{cost:450,add:0.05},{cost:850,add:0.05},{cost:1350,add:0.05},{cost:2000,add:0.05},{cost:2800,add:0.05}] },
+  pierce:     { name:'貫穿強化',   unit:'貫穿', icon:ICONS.diamond,
+                levels:[{cost:500,add:1},{cost:1000,add:1},{cost:1700,add:1}] },
+  bulletSize: { name:'彈體強化',   unit:'彈體', icon:ICONS.coin,
+                levels:[{cost:380,add:1},{cost:700,add:1},{cost:1100,add:1},{cost:1700,add:1}] },
+};
+let statUpgradeLevels = { dmg:0, cdr:0, pierce:0, bulletSize:0 };
+function computeEffectiveWeapon() {
+  const base = WEAPONS.find(w => w.id === equippedWeaponId) || WEAPONS[0];
+  let dmg = 1, cooldownMul = 1, pierce = base.pierce, bulletSizeAdd = 0;
+  const dl = statUpgradeLevels.dmg, cl = statUpgradeLevels.cdr, pl = statUpgradeLevels.pierce, bl = statUpgradeLevels.bulletSize;
+  for (let i = 0; i < dl; i++) dmg += STAT_UPGRADES.dmg.levels[i].add;
+  for (let i = 0; i < cl; i++) cooldownMul -= STAT_UPGRADES.cdr.levels[i].add;
+  for (let i = 0; i < pl; i++) pierce += STAT_UPGRADES.pierce.levels[i].add;
+  for (let i = 0; i < bl; i++) bulletSizeAdd += STAT_UPGRADES.bulletSize.levels[i].add;
+  cooldownMul = Math.max(0.35, cooldownMul); // 冷卻縮短有下限，避免疊到無限快
+  return {
+    id: base.id,
+    pellets: base.pellets,
+    spreadAngle: base.spreadAngle,
+    cooldown: Math.max(2, Math.round(base.cooldown * cooldownMul)),
+    pierce, dmg, bulletSizeAdd
+  };
+}
+let coins = 0;
+let diamonds = 0;
+let ownedWeapons = new Set(['default']);
+let equippedWeaponId = 'default';
+
+// ---- 體力強化（金幣消耗）：讓破完全部武器後的金幣還有地方花，
+// 也讓玩家在後期關卡（傷害倍率拉高）有辦法透過肝金幣換取更高生存力，而不是永遠卡在 100 血 ----
+const HP_UPGRADES = [
+  { cost: 300,  add: 20 },
+  { cost: 500,  add: 20 },
+  { cost: 750,  add: 20 },
+  { cost: 1050, add: 20 },
+  { cost: 1400, add: 20 },
+];
+let hpUpgradeLevel = 0; // 已購買的體力強化等級（0~HP_UPGRADES.length）
+function getMaxHp() {
+  let hp = 100;
+  for (let i = 0; i < hpUpgradeLevel && i < HP_UPGRADES.length; i++) hp += HP_UPGRADES[i].add;
+  return hp;
+}
+
+// ---- 造型（鑽石消耗）：純外觀收藏，不影響數值平衡，讓自由世界刷到的鑽石有地方花 ----
+const SKINS = [
+  { id:'default', name:'經典綠',   desc:'預設造型',                    cost:0,  body:'#34A99D' },
+  { id:'coral',   name:'珊瑚赤',   desc:'鑽石限定造型',                cost:8,  body:'#E2685A' },
+  { id:'royal',   name:'皇家藍紫', desc:'鑽石限定造型',                cost:14, body:'#5C6FA6' },
+  { id:'gold',    name:'榮耀金',   desc:'鑽石限定造型・金色描邊',       cost:22, body:'#E5CB90', stroke:'#8A6A2E' },
+  { id:'void',    name:'虛空黑曜', desc:'鑽石限定稀有造型・紫色光暈',   cost:35, body:'#2A2E45', stroke:'#B565FF', glow:'#B565FF' },
+];
+let ownedSkins = new Set(['default']);
+let equippedSkinId = 'default';
+
+// 存檔機制：優先嘗試 Claude artifact 的 window.storage，
+// 若不存在，或存取失敗（例如環境回傳格式不正確），自動改用瀏覽器的 localStorage，
+// 並記住這次失敗，之後就不再重試會失敗的管道，避免同樣的錯誤一直重複發生、也不會弄丟進度。
+let useClaudeStorage = typeof window.storage !== 'undefined';
+const LOCAL_STORAGE_KEY = 'arenaBrawlProgress';
+
+async function loadProgress() {
+  if (useClaudeStorage) {
+    try {
+      const result = await window.storage.get('progress', false);
+      if (result && result.value) applyProgressData(JSON.parse(result.value));
+      return;
+    } catch (e) {
+      console.warn('Claude storage 讀取進度失敗，改用瀏覽器本機儲存：', e.message || e);
+      useClaudeStorage = false; // 這個環境的 window.storage 不可靠，之後都改走 localStorage
+    }
+  }
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (raw) applyProgressData(JSON.parse(raw));
+  } catch (e) {
+    // 尚無存檔，使用預設值
+  }
+}
+
+function applyProgressData(data) {
+  coins = data.coins || 0;
+  diamonds = data.diamonds || 0;
+  unlockedLevel = data.unlockedLevel || 0;
+  ownedWeapons = new Set(data.ownedWeapons && data.ownedWeapons.length ? data.ownedWeapons : ['default']);
+  equippedWeaponId = data.equippedWeaponId || 'default';
+  lastLevel = data.lastLevel || 0;
+  hpUpgradeLevel = Math.min(HP_UPGRADES.length, data.hpUpgradeLevel || 0);
+  ownedSkins = new Set(data.ownedSkins && data.ownedSkins.length ? data.ownedSkins : ['default']);
+  equippedSkinId = (data.equippedSkinId && ownedSkins.has(data.equippedSkinId)) ? data.equippedSkinId : 'default';
+  // 屬性強化等級：舊存檔沒有這個欄位很正常（是這次新加入的系統），預設從 0 開始即可
+  const su = data.statUpgradeLevels || {};
+  statUpgradeLevels = {
+    dmg: Math.min(STAT_UPGRADES.dmg.levels.length, su.dmg || 0),
+    cdr: Math.min(STAT_UPGRADES.cdr.levels.length, su.cdr || 0),
+    pierce: Math.min(STAT_UPGRADES.pierce.levels.length, su.pierce || 0),
+    bulletSize: Math.min(STAT_UPGRADES.bulletSize.levels.length, su.bulletSize || 0),
+  };
+}
+
+async function saveProgress() {
+  const payload = JSON.stringify({
+    coins, diamonds, unlockedLevel,
+    ownedWeapons: Array.from(ownedWeapons),
+    equippedWeaponId,
+    lastLevel,
+    hpUpgradeLevel,
+    ownedSkins: Array.from(ownedSkins),
+    equippedSkinId,
+    statUpgradeLevels
+  });
+  if (useClaudeStorage) {
+    try {
+      const result = await window.storage.set('progress', payload, false);
+      if (result) return; // 存檔成功
+      throw new Error('empty response');
+    } catch (e) {
+      console.warn('Claude storage 存檔失敗，改用瀏覽器本機儲存：', e.message || e);
+      useClaudeStorage = false; // 這個環境的 window.storage 不可靠，之後都改走 localStorage
+    }
+  }
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, payload);
+  } catch (e) {
+    // 兩種存檔管道都失敗時，僅提示、不影響本次遊戲進行
+    console.warn('本機儲存也失敗，這次進度暫時無法保存（不影響本次遊戲）：', e.message || e);
+  }
+}
+
+// ---- Game state ----
+let player, bullets, enemies, particles, score, kills, gameOver, spawnTimer, shakeT, running;
+let enemyBullets, beams;
+let shieldSlams = []; // 「裂地護盾」武器的AoE衝擊特效清單
+let enemyIdCounter = 1;
+
+// ---- 連擊系統 (Combo)：短時間內連續擊殺會累積連擊數，每 5 連擊給一次分數加成＋畫面提示，
+// 是核心「亂鬥」爽感的關鍵回饋迴路——鼓勵玩家保持進攻節奏，而不是龜縮打帶跑。
+// 連擊分數只加在 score（用於自由世界換鑽石），完全不影響 kills（關卡過關門檻），所以不會動到既有數值平衡。
+const COMBO_WINDOW = 90; // 兩次擊殺間隔超過這個影格數（約1.5秒）連擊就會中斷歸零
+let comboCount = 0;
+let comboTimer = 0;
+let comboPopupT = 0;
+let comboPopupCount = 0;
+
+function registerKillCombo() {
+  comboTimer = COMBO_WINDOW;
+  comboCount++;
+  if (comboCount >= 2 && comboCount % 5 === 0) {
+    const bonus = Math.min(comboCount * 2, 60); // 連擊加成分數，封頂避免無限暴走
+    score += bonus;
+    comboPopupT = 46;
+    comboPopupCount = comboCount;
+    shakeT = Math.max(shakeT, comboCount >= 20 ? 10 : 6); // 高連擊時畫面震動更明顯，強化打擊感
+    sfx.pickup(); // 重複使用既有音效，避免額外新增音效資源
+  }
+}
+
+// ==== 物件池 (Object Pool) ====
+// 子彈、粒子、敵方彈幕、敵人都是高頻建立／銷毀的物件（尤其粒子爆炸與彈幕），
+// 直接 push/splice 會不斷丟給瀏覽器 GC 回收，量一多就容易頓一下。
+// 這裡改成「用完不丟，放回池子下次直接重複使用」，同一顆物件的記憶體重複被拿來當下一顆子彈/粒子用。
+function makePool() {
+  const free = [];
+  return {
+    get() { return free.length ? free.pop() : {}; },
+    put(obj) { free.push(obj); }
+  };
+}
+const bulletPool = makePool();
+const particlePool = makePool();
+const enemyBulletPool = makePool();
+const enemyPool = makePool();
+
+function acquireFrom(pool, props) {
+  const obj = pool.get();
+  for (const k in obj) delete obj[k]; // 清掉舊物件殘留的欄位，避免不同用途間互相汙染欄位
+  Object.assign(obj, props);
+  return obj;
+}
+function acquireBullet(props)      { return acquireFrom(bulletPool, props); }
+function acquireParticle(props)    { return acquireFrom(particlePool, props); }
+function acquireEnemyBullet(props) { return acquireFrom(enemyBulletPool, props); }
+function acquireEnemy(props)       { return acquireFrom(enemyPool, props); }
+function releaseBullet(b)      { bulletPool.put(b); }
+function releaseParticle(p)    { particlePool.put(p); }
+function releaseEnemyBullet(b) { enemyBulletPool.put(b); }
+function releaseEnemy(e)       { enemyPool.put(e); }
+
+// ==== 空間網格分割 (Spatial Hash Grid) ====
+// 子彈打敵人若逐一比對「每顆子彈 × 每個敵人」，敵人與子彈一多，效能會是 O(n*m) 直線惡化。
+// 改成把敵人依座標丟進固定大小的網格格子，子彈碰撞檢查時只需要查詢自己周圍幾格，
+// 直接跳過離自己很遠、根本不可能碰到的敵人，敵人再多也不會拖慢碰撞判定。
+const MAX_ENEMY_R = 50; // 目前最大敵人（魔王 46）半徑的安全上限，query 半徑會用到
+class SpatialGrid {
+  constructor(cellSize) { this.cellSize = cellSize; this.cells = new Map(); }
+  _key(cx, cy) { return cx + '_' + cy; }
+  clear() { this.cells.clear(); }
+  insert(obj) {
+    const cx = Math.floor(obj.x / this.cellSize);
+    const cy = Math.floor(obj.y / this.cellSize);
+    const k = this._key(cx, cy);
+    let bucket = this.cells.get(k);
+    if (!bucket) { bucket = []; this.cells.set(k, bucket); }
+    bucket.push(obj);
+  }
+  query(x, y, radius) {
+    const out = [];
+    const minCx = Math.floor((x - radius) / this.cellSize);
+    const maxCx = Math.floor((x + radius) / this.cellSize);
+    const minCy = Math.floor((y - radius) / this.cellSize);
+    const maxCy = Math.floor((y + radius) / this.cellSize);
+    for (let cx = minCx; cx <= maxCx; cx++) {
+      for (let cy = minCy; cy <= maxCy; cy++) {
+        const bucket = this.cells.get(this._key(cx, cy));
+        if (bucket) for (const o of bucket) out.push(o);
+      }
+    }
+    return out;
+  }
+}
+const enemyGrid = new SpatialGrid(80);
+
+// ---- Free World（自由世界：開放地圖，會刷怪，分數達標可獲得鑽石獎勵） ----
+let freeWorldMode = false;
+let camX = 0, camY = 0;
+const WORLD_W = 2400, WORLD_H = 1800;
+let scenery = [];
+// 自由世界難度不再是固定值，而是「破解過越多關卡」＋「這局目前分數越高」就越難：
+// - progress：依存檔裡解鎖到第幾關（0~12），代表玩家整體的遊戲進度，決定自由世界的起始難度
+// - surge：這一局自由世界目前的分數，分數越滾越多，這局裡的敵人也會跟著越打越硬、越密集（無盡模式的漸強感）
+function getFreeWorldLevel() {
+  const progress = Math.min(unlockedLevel, LEVELS.length - 1) / (LEVELS.length - 1); // 0~1
+  const surge = Math.min(score / 300, 6); // 每 300 分疊 1 階，最高疊 6 階，避免後期直接打不動
+  const tier = progress * 4 + surge; // 綜合難度階級，兩個因素一起疊加
+  return {
+    name: '自由世界',
+    spawnInterval: Math.max(14, 75 - tier * 6),      // 越打越密集，最快每 14 幀刷一隻
+    toughChance: Math.min(0.5, 0.10 + tier * 0.035), // 精英怪比例上升，最高一半
+    speedMul: Math.min(1.8, 1.0 + tier * 0.06),
+    hpMul: 1.0 + tier * 0.18,
+    dmgMul: Math.min(2.2, 1.0 + tier * 0.09)
+  };
+}
+const FREE_WORLD_DIAMOND_STEP = 150; // 自由世界每累積這麼多分數，獎勵 1 顆鑽石
+let lastDiamondScore = 0;
+let diamondPopup = 0; // 畫面「+鑽石」提示的顯示倒數（frame 數）
+let diamondPopupCount = 1;
+
+function generateScenery() {
+  scenery = [];
+  const kinds = ['flower1','flower2','clover','treeRound','treePine','rock','sunflower','mushroom','cloud'];
+  const n = 160;
+  for (let i=0;i<n;i++) {
+    scenery.push({
+      x: Math.random()*WORLD_W,
+      y: Math.random()*WORLD_H,
+      kind: kinds[Math.floor(Math.random()*kinds.length)],
+      size: 20 + Math.random()*26
+    });
+  }
+}
+
+function startFreeWorld() {
+  freeWorldMode = true;
+  { const mhp = getMaxHp(); player = { x: WORLD_W/2, y: WORLD_H/2, r: 16, hp: mhp, maxHp: mhp, speed: 3.4, cooldown: 0, angle: 0, invuln: 60, recoil: 0 }; }
+  bullets = [];
+  enemies = [];
+  enemyBullets = [];
+  beams = [];
+  shieldSlams = [];
+  particles = [];
+  score = 0;
+  kills = 0;
+  lastDiamondScore = 0;
+  diamondPopup = 0;
+  comboCount = 0;
+  comboTimer = 0;
+  comboPopupT = 0;
+  gameOver = false;
+  spawnTimer = 60;
+  shakeT = 0;
+  running = true;
+  camX = Math.max(0, Math.min(WORLD_W-W, player.x - W/2));
+  camY = Math.max(0, Math.min(WORLD_H-H, player.y - H/2));
+  generateScenery();
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('levelSelect').style.display = 'none';
+  updateHUD();
+}
+
+function startLevel(idx) {
+  freeWorldMode = false;
+  currentLevel = idx;
+  lastLevel = idx;
+  saveProgress(); // 記住「最近在玩的關卡」，之後在自由世界點左上角就能直接跳回來，重開網頁也記得
+  { const mhp = getMaxHp(); player = { x: W/2, y: H/2, r: 16, hp: mhp, maxHp: mhp, speed: 3.2, cooldown: 0, angle: 0, invuln: 0, recoil: 0 }; }
+  bullets = [];
+  enemies = [];
+  enemyBullets = [];
+  beams = [];
+  shieldSlams = [];
+  particles = [];
+  score = 0;
+  kills = 0;
+  gameOver = false;
+  spawnTimer = 0;
+  shakeT = 0;
+  comboCount = 0;
+  comboTimer = 0;
+  comboPopupT = 0;
+  running = true;
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('levelSelect').style.display = 'none';
+  const lv = LEVELS[idx];
+  if (lv.boss) spawnBoss();
+  updateHUD();
+}
+
+function showLevelSelect() {
+  running = false;
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('shopScreen').style.display = 'none';
+  document.getElementById('levelSelect').style.display = 'flex';
+  document.getElementById('selectCoinDisplay').innerHTML = ICONS.coin + ' ' + coins + '　' + ICONS.diamond + ' ' + diamonds;
+  renderLevelSelect();
+}
+
+function renderLevelSelect() {
+  const grid = document.getElementById('levelGrid');
+  grid.innerHTML = '';
+  LEVELS.forEach((lv, i) => {
+    const card = document.createElement('div');
+    const locked = i > unlockedLevel;
+    const cleared = i < unlockedLevel;
+    card.className = 'levelCard' + (locked ? ' locked' : '') + (cleared ? ' cleared' : '') + (lv.boss ? ' boss' : '');
+    card.innerHTML = locked
+      ? `<svg viewBox="0 0 24 24" width="18" height="18"><rect x="5" y="11" width="14" height="10" rx="2" fill="#C9BE9E" stroke="var(--ink)" stroke-width="1.6"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="15.5" r="1.5" fill="var(--ink)"/></svg><span style="font-size:11px;">${lv.boss ? '？？？' : '第'+(i+1)+'關'}</span>`
+      : `<span class="num">${cleared
+          ? `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2.5 L14.9 8.9 L21.9 9.6 L16.6 14.2 L18.2 21.1 L12 17.4 L5.8 21.1 L7.4 14.2 L2.1 9.6 L9.1 8.9 Z" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.6" stroke-linejoin="round"/></svg>`
+          : (lv.boss
+            ? `<svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 18 L4 10 L8 13 L12 7 L16 13 L20 10 L20 18 Z" fill="var(--grape)" stroke="var(--ink)" stroke-width="1.6" stroke-linejoin="round"/></svg>`
+            : (i+1))
+        }</span><span style="font-size:11px;">${lv.name}</span>`;
+    if (!locked) card.addEventListener('click', () => startLevel(i));
+    grid.appendChild(card);
+  });
+}
+
+function updateShopCoinDisplay() {
+  document.getElementById('shopCoinDisplay').innerHTML = ICONS.coin + ' ' + coins + '　' + ICONS.diamond + ' ' + diamonds;
+}
+
+function renderWeaponShop() {
+  const grid = document.getElementById('weaponGrid');
+  grid.innerHTML = '';
+  WEAPONS.forEach(w => {
+    const owned = ownedWeapons.has(w.id);
+    const equipped = equippedWeaponId === w.id;
+    const card = document.createElement('div');
+    card.className = 'weaponCard' + (equipped ? ' equipped' : '');
+    card.innerHTML = `
+      <div class="wInfo">
+        <div class="wName">${w.name}${equipped ? '（裝備中）' : ''}</div>
+        <div class="wDesc">${w.desc}</div>
+        <div class="wDesc" style="color:#5C6FA6; margin-top:2px;">${owned ? (ICONS.check + ' 已擁有　武器強度請至「升級」頁面調整') : '武器決定打法，強度在「升級」頁面'}</div>
+      </div>
+      <button class="wBtn">${owned ? (equipped ? '裝備中' : '裝備') : ('購買 ' + ICONS.coin + w.cost)}</button>
+    `;
+    const btn = card.querySelector('.wBtn');
+    if (owned) {
+      if (equipped) { btn.disabled = true; }
+      else { btn.addEventListener('click', () => { equippedWeaponId = w.id; saveProgress(); renderWeaponShop(); }); }
+    } else {
+      if (coins < w.cost) btn.disabled = true;
+      btn.addEventListener('click', () => {
+        if (coins >= w.cost) {
+          coins -= w.cost;
+          ownedWeapons.add(w.id);
+          equippedWeaponId = w.id;
+          saveProgress();
+          renderWeaponShop();
+          updateShopCoinDisplay();
+        }
+      });
+    }
+    grid.appendChild(card);
+  });
+}
+
+// 通用的「格子升級卡」產生器：一張卡 = 一個可升級項目，下面一整排格子對應每一等級，
+// 已買=打勾格、下一級=可點的價格格、之後=鎖住的灰格，體力跟四項屬性強化共用同一套版型。
+function buildUpgradeCard({ icon, name, levels, curLevel, unitFormat, onBuy }) {
+  const card = document.createElement('div');
+  card.className = 'upgCard';
+  const totalSoFar = levels.slice(0, curLevel).reduce((s, l) => s + l.add, 0);
+  card.innerHTML = `
+    <div class="upgHead">
+      <div class="upgIcon">${icon}</div>
+      <div class="upgTextWrap">
+        <div class="wName">${name}</div>
+        <div class="wDesc">目前：${unitFormat(totalSoFar)}</div>
+      </div>
+    </div>
+    <div class="upgCells"></div>
+  `;
+  const cellsWrap = card.querySelector('.upgCells');
+  levels.forEach((lvl, i) => {
+    const cell = document.createElement('div');
+    if (i < curLevel) {
+      cell.className = 'upgCell done';
+      cell.innerHTML = ICONS.check;
+    } else if (i === curLevel) {
+      const affordable = coins >= lvl.cost;
+      cell.className = 'upgCell next' + (affordable ? '' : ' disabled');
+      cell.innerHTML = ICONS.coin + lvl.cost;
+      if (affordable) {
+        cell.addEventListener('click', () => {
+          if (coins >= lvl.cost && curLevel === (i)) {
+            coins -= lvl.cost;
+            onBuy();
+            saveProgress();
+            renderUpgradeShop();
+            updateShopCoinDisplay();
+          }
+        });
+      }
+    } else {
+      cell.className = 'upgCell locked';
+      cell.textContent = 'Lv.' + (i + 1);
+    }
+    cellsWrap.appendChild(cell);
+  });
+  return card;
+}
+
+// 升級頁面：體力強化＋四項屬性強化（傷害／冷卻／貫穿／彈體），全部改成花金幣的格子式升級，
+// 是「後續關卡」數值成長的長期消耗目標，跟武器（決定打法）完全脫鉤。
+function renderUpgradeShop() {
+  const grid = document.getElementById('upgradeGrid');
+  grid.innerHTML = '';
+
+  grid.appendChild(buildUpgradeCard({
+    icon: ICONS.crown,
+    name: '體力強化',
+    levels: HP_UPGRADES,
+    curLevel: hpUpgradeLevel,
+    unitFormat: (total) => `最大體力 ${100 + total}`,
+    onBuy: () => { hpUpgradeLevel++; }
+  }));
+
+  const statMeta = [
+    { key: 'dmg',        fmt: t => `傷害 +${t}` },
+    { key: 'cdr',        fmt: t => `冷卻 -${Math.round(t * 100)}%` },
+    { key: 'pierce',     fmt: t => `貫穿 +${t}` },
+    { key: 'bulletSize', fmt: t => `彈體 +${t}` },
+  ];
+  statMeta.forEach(({ key, fmt }) => {
+    const def = STAT_UPGRADES[key];
+    grid.appendChild(buildUpgradeCard({
+      icon: def.icon,
+      name: def.name,
+      levels: def.levels,
+      curLevel: statUpgradeLevels[key],
+      unitFormat: fmt,
+      onBuy: () => { statUpgradeLevels[key]++; }
+    }));
+  });
+}
+
+// 造型：純外觀收藏，用鑽石購買，讓自由世界刷到的鑽石有明確用途
+function renderSkinShop() {
+  const grid = document.getElementById('skinGrid');
+  grid.innerHTML = '';
+  SKINS.forEach(s => {
+    const owned = ownedSkins.has(s.id);
+    const equipped = equippedSkinId === s.id;
+    const card = document.createElement('div');
+    card.className = 'weaponCard' + (equipped ? ' equipped' : '');
+    const swatch = `<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${s.body};border:2px solid ${s.stroke || '#24414A'};vertical-align:-2px;margin-right:6px;"></span>`;
+    card.innerHTML = `
+      <div class="wInfo">
+        <div class="wName">${swatch}${s.name}${equipped ? '（裝備中）' : ''}</div>
+        <div class="wDesc">${s.desc}</div>
+      </div>
+      <button class="wBtn">${owned ? (equipped ? '裝備中' : '裝備') : ('購買 ' + ICONS.diamond + s.cost)}</button>
+    `;
+    const btn = card.querySelector('.wBtn');
+    if (owned) {
+      if (equipped) { btn.disabled = true; }
+      else { btn.addEventListener('click', () => { equippedSkinId = s.id; saveProgress(); renderSkinShop(); }); }
+    } else {
+      if (diamonds < s.cost) btn.disabled = true;
+      btn.addEventListener('click', () => {
+        if (diamonds >= s.cost) {
+          diamonds -= s.cost;
+          ownedSkins.add(s.id);
+          equippedSkinId = s.id;
+          saveProgress();
+          renderSkinShop();
+          updateShopCoinDisplay();
+        }
+      });
+    }
+    grid.appendChild(card);
+  });
+}
+
+function renderShop() {
+  updateShopCoinDisplay();
+  renderWeaponShop();
+  renderUpgradeShop();
+  renderSkinShop();
+}
+
+let shopTab = 'weapon';
+function switchShopTab(tab) {
+  shopTab = tab;
+  document.getElementById('weaponGrid').style.display = tab === 'weapon' ? 'flex' : 'none';
+  document.getElementById('upgradeGrid').style.display = tab === 'upgrade' ? 'flex' : 'none';
+  document.getElementById('skinGrid').style.display = tab === 'skin' ? 'flex' : 'none';
+  document.getElementById('tabWeapon').classList.toggle('active', tab === 'weapon');
+  document.getElementById('tabUpgrade').classList.toggle('active', tab === 'upgrade');
+  document.getElementById('tabSkin').classList.toggle('active', tab === 'skin');
+}
+document.getElementById('tabWeapon').addEventListener('click', () => switchShopTab('weapon'));
+document.getElementById('tabUpgrade').addEventListener('click', () => switchShopTab('upgrade'));
+document.getElementById('tabSkin').addEventListener('click', () => switchShopTab('skin'));
+
+function showShop() {
+  running = false;
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('levelSelect').style.display = 'none';
+  document.getElementById('shopScreen').style.display = 'flex';
+  renderShop();
+  switchShopTab(shopTab);
+}
+
+let lastHudHp = -1, lastHudScore = -1, lastHudCoins = -1, lastHudDiamonds = -1, lastHudLine = '', lastHudLogo = '';
+function updateHUD() {
+  const hpPct = Math.max(0, (player.hp/player.maxHp*100));
+  if (hpPct !== lastHudHp) {
+    document.getElementById('hpBar').style.width = hpPct + '%';
+    lastHudHp = hpPct;
+  }
+  if (score !== lastHudScore) {
+    document.getElementById('scoreText').textContent = '分數：' + score;
+    lastHudScore = score;
+  }
+  if (coins !== lastHudCoins) {
+    document.getElementById('coinText').textContent = coins;
+    lastHudCoins = coins;
+  }
+  if (diamonds !== lastHudDiamonds) {
+    document.getElementById('diamondText').textContent = diamonds;
+    lastHudDiamonds = diamonds;
+  }
+  let line;
+  if (freeWorldMode) {
+    const toNext = FREE_WORLD_DIAMOND_STEP - (score - lastDiamondScore);
+    line = `${ICONS.globe} 自由世界 · <span id="progressText">再 ${toNext} 分獲得 ${ICONS.diamond}</span>`;
+  } else {
+    const lv = LEVELS[currentLevel];
+    const progress = lv.boss ? `${ICONS.crown} 擊敗魔王！` : `擊殺 ${kills}/${lv.killTarget}`;
+    line = `第 ${currentLevel+1} 關 · <span id="progressText">${progress}</span>`;
+  }
+  if (line !== lastHudLine) {
+    document.getElementById('levelLine').innerHTML = line;
+    lastHudLine = line;
+  }
+  // 自由世界時，左上角徽章變成「返回第X關」可點擊按鈕；一般關卡則維持原本的裝飾標題
+  const logoText = freeWorldMode ? `${ICONS.back} 返回第 ${lastLevel+1} 關` : `${ICONS.sword} 競技場亂鬥`;
+  if (logoText !== lastHudLogo) {
+    const logoEl = document.getElementById('logo');
+    logoEl.innerHTML = logoText;
+    logoEl.classList.toggle('clickable', freeWorldMode);
+    lastHudLogo = logoText;
+  }
+}
+
+// ---- 敵人 AI 多樣化：每個小怪隨機分配一種行為類型，不再全部只會直線衝向玩家 ----
+// chaser  直衝型：原本雜兵的行為，直線衝向玩家（多數怪物仍是這種，維持基本節奏）
+// ranger  遠程型：與玩家保持距離、側移閃躲，並定時發射彈幕
+// flanker 側翼型：繞著玩家旋轉包夾，試圖從側面／背後靠近
+// dasher  衝刺型：蓄力後高速衝刺一段距離，衝刺前會有警示光圈可供玩家反應閃避
+const TYPE_COLOR = { chaser: '#FF3B3B', ranger: '#FFB020', flanker: '#E85DA0', dasher: '#4D8DFF' };
+function pickAiType(lvIdx) {
+  const r = Math.random();
+  if (lvIdx <= 0) {
+    // 第一關維持單純一點，讓新手先熟悉基本節奏，只混入少量遠程怪
+    return r < 0.82 ? 'chaser' : 'ranger';
+  }
+  if (r < 0.5) return 'chaser';
+  if (r < 0.72) return 'ranger';
+  if (r < 0.88) return 'flanker';
+  return 'dasher';
+}
+
+function spawnEnemy() {
+  const lv = freeWorldMode ? getFreeWorldLevel() : LEVELS[currentLevel];
+  // 一般關卡直接用畫面邊界；自由世界地圖比畫面大很多，改用鏡頭目前看到的範圍邊緣來刷怪
+  const vx0 = freeWorldMode ? camX : 0;
+  const vy0 = freeWorldMode ? camY : 0;
+  const vx1 = freeWorldMode ? camX + W : W;
+  const vy1 = freeWorldMode ? camY + H : H;
+  const edge = Math.floor(Math.random()*4);
+  let x, y;
+  if (edge===0) { x = vx0 + Math.random()*(vx1-vx0); y = vy0-20; }
+  else if (edge===1) { x = vx0 + Math.random()*(vx1-vx0); y = vy1+20; }
+  else if (edge===2) { x = vx0-20; y = vy0 + Math.random()*(vy1-vy0); }
+  else { x = vx1+20; y = vy0 + Math.random()*(vy1-vy0); }
+  const tough = Math.random() < lv.toughChance;
+  const baseHp = tough ? 3 : 1;
+  const hp = Math.max(1, Math.round(baseHp * lv.hpMul));
+  const aiType = pickAiType(freeWorldMode ? 2 : currentLevel);
+  enemies.push(acquireEnemy({
+    id: enemyIdCounter++,
+    x, y,
+    r: tough ? 20 : 14,
+    hp, maxHp: hp,
+    speed: (tough ? 1.0 : 1.6 + Math.random()*0.6) * lv.speedMul,
+    color: tough ? '#9B30FF' : TYPE_COLOR[aiType],
+    dmg: (tough ? 18 : 10) * lv.dmgMul,
+    tough,
+    aiType,
+    // 各類型專用狀態，先給預設值／隨機起始延遲，避免同批怪物動作完全同步
+    rangerTimer: 40 + Math.random()*60,
+    flankDir: Math.random() < 0.5 ? -1 : 1,
+    dashState: 'idle',
+    dashTimer: 30 + Math.random()*60,
+    dashDir: null
+  }));
+}
+
+function spawnBoss() {
+  enemies.push(acquireEnemy({
+    id: enemyIdCounter++,
+    boss: true,
+    x: W/2, y: 90,
+    r: 46,
+    hp: 260, maxHp: 260,
+    speed: 0.9,
+    color: '#5C6FA6',
+    dmg: 22,
+    tough: true,
+    attackTimer: 100,
+    summonTimer: 280,
+    enraged: false
+  }));
+}
+
+function pointSegmentDistance(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx*dx + dy*dy;
+  let t = lenSq > 0 ? ((px-x1)*dx + (py-y1)*dy) / lenSq : 0;
+  t = Math.max(0, Math.min(1, t));
+  const cx = x1 + t*dx, cy = y1 + t*dy;
+  return Math.hypot(px-cx, py-cy);
+}
+
+function spawnParticles(x,y,color,n=8) {
+  for (let i=0;i<n;i++) {
+    particles.push(acquireParticle({
+      x, y,
+      vx: (Math.random()-0.5)*6,
+      vy: (Math.random()-0.5)*6,
+      life: 20 + Math.random()*10,
+      color
+    }));
+  }
+}
+
+function spawnShards(x, y, color, n=8) {
+  // 死亡時的碎裂爆開效果：不規則三角碎片＋旋轉，比純圓點更有「破碎」的份量感
+  for (let i=0;i<n;i++) {
+    const a = (Math.PI*2/n)*i + Math.random()*0.4;
+    const spd = 2.5 + Math.random()*3.5;
+    particles.push(acquireParticle({
+      x, y,
+      vx: Math.cos(a)*spd,
+      vy: Math.sin(a)*spd,
+      life: 22 + Math.random()*14,
+      maxLife: 36,
+      color,
+      shard: true,
+      size: 4 + Math.random()*4,
+      rot: Math.random()*Math.PI*2,
+      rotSpeed: (Math.random()-0.5)*0.5
+    }));
+  }
+}
+
+function checkDiamondReward() {
+  // 自由世界每累積 FREE_WORLD_DIAMOND_STEP 分數就獎勵 1 顆鑽石，用 while 避免一次擊殺跨過多個門檻時漏算
+  let earned = 0;
+  while (score - lastDiamondScore >= FREE_WORLD_DIAMOND_STEP) {
+    lastDiamondScore += FREE_WORLD_DIAMOND_STEP;
+    diamonds++;
+    earned++;
+  }
+  if (earned > 0) {
+    spawnParticles(player.x, player.y, '#4DE8FF', 10 * earned);
+    diamondPopup = 70;
+    diamondPopupCount = earned;
+    sfx.pickup();
+    saveProgress();
+    updateHUD();
+  }
+}
+
+function fireBeam(eff, ang) {
+  // 激光光束：瞬間打穿整條直線上的所有敵人，命中判定用點到線段距離計算
+  const beamLen = Math.hypot(W, H) + 40;
+  const ex = player.x + Math.cos(ang)*beamLen;
+  const ey = player.y + Math.sin(ang)*beamLen;
+  const beamWidth = 20 + currentLevel*1.8 + eff.bulletSizeAdd*1.4; // 加寬攻擊範圍：基礎值與關卡/武器加成都提高
+  for (const e of enemies) {
+    const d = pointSegmentDistance(e.x, e.y, player.x, player.y, ex, ey);
+    if (d < e.r + beamWidth/2) {
+      e.hp -= eff.dmg;
+      e.hitT = 8;
+      spawnParticles(e.x, e.y, e.color, 6);
+      sfx.hit();
+    }
+  }
+  // 統一在傷害結算後才處理死亡，避免邊掃描邊刪除陣列造成漏判
+  for (let i=enemies.length-1;i>=0;i--) {
+    const e = enemies[i];
+    if (e.hp <= 0) {
+      spawnShards(e.x, e.y, e.color, e.boss ? 22 : (e.tough ? 16 : 10));
+      score += e.tough ? 30 : 10;
+      kills++;
+      registerKillCombo();
+      sfx.kill();
+      releaseEnemy(e);
+      enemies.splice(i,1);
+    }
+  }
+  beams.push({ x1: player.x, y1: player.y, x2: ex, y2: ey, life: 10, width: beamWidth });
+  if (freeWorldMode) {
+    checkDiamondReward();
+  } else {
+    const lv = LEVELS[currentLevel];
+    if (kills >= lv.killTarget) levelClear();
+  }
+}
+
+// 「裂地護盾」：完全不同於其他武器的坦度近戰打法——不用瞄準、原地對周圍整圈造成一次高傷害衝擊。
+// 冷卻長（70影格，約是預設手槍7倍）換來範圍大、傷害高，是核心武器多樣性缺口要補的「近戰大範圍」定位。
+function fireShieldSlam(eff) {
+  const slamRadius = 78 + currentLevel*3 + eff.bulletSizeAdd*2;
+  for (const e of enemies) {
+    const d = Math.hypot(e.x - player.x, e.y - player.y);
+    if (d < e.r + slamRadius) {
+      e.hp -= eff.dmg * 2.4; // 沒有射程優勢，用高倍率傷害補償近戰的風險
+      e.hitT = 8;
+      spawnParticles(e.x, e.y, e.color, 8);
+      sfx.hit();
+    }
+  }
+  for (let i=enemies.length-1;i>=0;i--) {
+    const e = enemies[i];
+    if (e.hp <= 0) {
+      spawnShards(e.x, e.y, e.color, e.boss ? 22 : (e.tough ? 16 : 10));
+      score += e.tough ? 30 : 10;
+      kills++;
+      registerKillCombo();
+      sfx.kill();
+      releaseEnemy(e);
+      enemies.splice(i,1);
+    }
+  }
+  shieldSlams.push({ x: player.x, y: player.y, r: slamRadius, life: 18, maxLife: 18, ang: player.angle || 0 });
+  shakeT = Math.max(shakeT, 9);
+  if (freeWorldMode) {
+    checkDiamondReward();
+  } else {
+    const lv = LEVELS[currentLevel];
+    if (kills >= lv.killTarget) levelClear();
+  }
+}
+
+function findNearestEnemy(x, y, maxRange) {
+  // 自瞄用：找出範圍內離指定座標最近的敵人；場上敵人數量不多（數十以內），直接線性掃描即可
+  let best = null, bestD = maxRange;
+  for (const e of enemies) {
+    const d = Math.hypot(e.x - x, e.y - y);
+    if (d < bestD) { bestD = d; best = e; }
+  }
+  return best;
+}
+
+function shoot() {
+  if (player.cooldown > 0) return;
+  const eff = computeEffectiveWeapon();
+  player.cooldown = eff.cooldown;
+  player.recoil = 8;
+  const ang = player.angle;
+  if (eff.id === 'plasma') {
+    fireBeam(eff, ang);
+    return;
+  }
+  if (eff.id === 'shieldsword') {
+    fireShieldSlam(eff);
+    return;
+  }
+  const bulletR = 5 + currentLevel * 1.4 + eff.bulletSizeAdd; // 子彈隨關卡等級與被動加成變大
+  const n = eff.pellets;
+  const isBoomerang = eff.id === 'boomerang';
+  for (let k = 0; k < n; k++) {
+    let offset = 0;
+    if (n > 1) offset = -eff.spreadAngle/2 + (eff.spreadAngle/(n-1)) * k;
+    const a = ang + offset;
+    if (isBoomerang) {
+      // 迴力鏢：先飛出去一段距離，之後自動轉向並飛回玩家手上，來回全程都能造成傷害
+      bullets.push(acquireBullet({
+        type: 'boomerang',
+        x: player.x + Math.cos(a)*player.r,
+        y: player.y + Math.sin(a)*player.r,
+        vx: Math.cos(a)*8,
+        vy: Math.sin(a)*8,
+        r: bulletR,
+        dmg: eff.dmg,
+        dist: 0,
+        maxDist: 190 + currentLevel * 8,
+        returning: false,
+        rot: 0,
+        hitIds: new Set()
+      }));
+    } else {
+      bullets.push(acquireBullet({
+        x: player.x + Math.cos(a)*player.r,
+        y: player.y + Math.sin(a)*player.r,
+        vx: Math.cos(a)*8,
+        vy: Math.sin(a)*8,
+        r: bulletR,
+        pierce: eff.pierce,
+        dmg: eff.dmg
+      }));
+    }
+  }
+}
+
+function update() {
+  if (!running) return;
+
+  // movement
+  let dx = 0, dy = 0;
+  if (keys['w'] || keys['arrowup']) dy -= 1;
+  if (keys['s'] || keys['arrowdown']) dy += 1;
+  if (keys['a'] || keys['arrowleft']) dx -= 1;
+  if (keys['d'] || keys['arrowright']) dx += 1;
+  dx += joyVec.x; dy += joyVec.y; // 搖桿現在滑鼠、觸控都能拖動，兩種輸入方式都直接套用
+  const len = Math.hypot(dx,dy);
+  if (len > 0) {
+    player.x += (dx/len) * player.speed;
+    player.y += (dy/len) * player.speed;
+  }
+  if (freeWorldMode) {
+    player.x = Math.max(player.r, Math.min(WORLD_W-player.r, player.x));
+    player.y = Math.max(player.r, Math.min(WORLD_H-player.r, player.y));
+    camX = Math.max(0, Math.min(WORLD_W-W, player.x - W/2));
+    camY = Math.max(0, Math.min(WORLD_H-H, player.y - H/2));
+  } else {
+    player.x = Math.max(player.r, Math.min(W-player.r, player.x));
+    player.y = Math.max(player.r, Math.min(H-player.r, player.y));
+  }
+
+  // aim：手動瞄準——正在拖攻擊搖桿時（觸控拖曳或滑鼠 Pointer Lock 拖曳皆同）用它的方向；
+  // 沒有拖曳出方向時維持原朝向，實際攻擊方向交給下面「自動鎖定最近敵人」處理
+  if (atkAiming) {
+    player.angle = atkAngle;
+  }
+
+  if (player.cooldown > 0) player.cooldown--;
+  if (player.invuln > 0) player.invuln--;
+  if (player.recoil > 0) player.recoil--;
+  // 攻擊鍵採用 Brawl Stars 的操作方式（電腦滑鼠與手機觸控共用同一套邏輯）：
+  // 按著攻擊鍵但沒有拖曳出方向（點著不動）＝自動鎖定範圍內最近的敵人；
+  // 一旦拖曳出方向（atkAiming 為真），就交回手動瞄準，攻擊方向完全跟著拖曳方向走。
+  if (atkHeld && !atkAiming) {
+    const target = findNearestEnemy(player.x, player.y, 320);
+    if (target) player.angle = Math.atan2(target.y - player.y, target.x - player.x);
+  }
+  // 攻擊統一交給 atkHeld 判斷：滑鼠拖曳攻擊鍵、空白鍵、觸控攻擊鍵皆共用同一個狀態
+  const attacking = atkHeld;
+  if (attacking) shoot();
+
+
+  // bullets
+  for (let i=bullets.length-1;i>=0;i--) {
+    const b = bullets[i];
+    if (b.type === 'boomerang') {
+      b.rot += 0.5; // 旋轉動畫
+      if (!b.returning) {
+        b.x += b.vx; b.y += b.vy;
+        b.dist += Math.hypot(b.vx, b.vy);
+        if (b.dist >= b.maxDist) {
+          b.returning = true;
+          b.hitIds.clear(); // 回程重新允許擊中同一批敵人
+        }
+      } else {
+        const dx = player.x - b.x, dy = player.y - b.y;
+        const d = Math.hypot(dx, dy);
+        if (d < player.r + b.r) { releaseBullet(b); bullets.splice(i,1); continue; } // 飛回玩家手中，收回迴力鏢
+        const spd = 9;
+        b.vx = (dx/d) * spd;
+        b.vy = (dy/d) * spd;
+        b.x += b.vx; b.y += b.vy;
+      }
+      continue; // 迴力鏢自成一套移動/回收邏輯，不套用一般子彈的邊界銷毀
+    }
+    b.x += b.vx; b.y += b.vy;
+    if (freeWorldMode) {
+      if (b.x<camX-15||b.x>camX+W+15||b.y<camY-15||b.y>camY+H+15) { releaseBullet(b); bullets.splice(i,1); continue; }
+    } else if (b.x<-10||b.x>W+10||b.y<-10||b.y>H+10) { releaseBullet(b); bullets.splice(i,1); continue; }
+  }
+
+  // spawn logic
+  const lv = freeWorldMode ? getFreeWorldLevel() : LEVELS[currentLevel];
+  if (!lv.boss) {
+    spawnTimer--;
+    if (spawnTimer <= 0) {
+      spawnEnemy();
+      spawnTimer = lv.spawnInterval;
+    }
+  }
+
+  // enemies：先跑各自的 AI／移動與跟玩家的近戰碰撞；子彈碰撞判定抽到下面用網格分割集中處理
+  for (let i=enemies.length-1;i>=0;i--) {
+    const e = enemies[i];
+    if (e.hitT > 0) e.hitT--;
+    if (e.boss) {
+      // 魔王 AI：定時朝玩家發射彈幕、定時召喚小怪、血量過半後進入狂暴
+      e.attackTimer--;
+      if (e.attackTimer <= 0) {
+        const baseAngle = Math.atan2(player.y-e.y, player.x-e.x);
+        const shots = e.enraged ? 12 : 7;
+        for (let s=0; s<shots; s++) {
+          const a = e.enraged ? (Math.PI*2/shots)*s : (baseAngle - 0.45 + (0.9/(shots-1))*s);
+          enemyBullets.push(acquireEnemyBullet({ x:e.x, y:e.y, vx:Math.cos(a)*4.4, vy:Math.sin(a)*4.4, r:7, dmg:14 }));
+        }
+        e.attackTimer = e.enraged ? 55 : 90;
+      }
+      e.summonTimer--;
+      if (e.summonTimer <= 0 && enemies.length < 14) {
+        spawnEnemy(); spawnEnemy();
+        e.summonTimer = e.enraged ? 210 : 320;
+      }
+      if (!e.enraged && e.hp <= e.maxHp*0.5) {
+        e.enraged = true;
+        e.speed *= 1.35;
+        e.dmg = 30;
+        e.color = '#E2685A';
+      }
+    }
+
+    const d = Math.hypot(player.x-e.x, player.y-e.y);
+    const dirX = d > 0.0001 ? (player.x-e.x)/d : 0;
+    const dirY = d > 0.0001 ? (player.y-e.y)/d : 1;
+
+    // 敵人 AI 多樣化：不同類型走不同移動邏輯；boss／沒有分類的一律落到 default（原本的直衝行為）
+    switch (e.aiType) {
+      case 'ranger': {
+        // 遠程型：與玩家保持理想射程，太近後退、太遠靠近，射程內則側移閃躲並定時發射彈幕
+        const desired = 170;
+        if (d < desired - 20) { e.x -= dirX*e.speed; e.y -= dirY*e.speed; }
+        else if (d > desired + 20) { e.x += dirX*e.speed; e.y += dirY*e.speed; }
+        else { e.x += -dirY*e.speed*0.7; e.y += dirX*e.speed*0.7; }
+        e.rangerTimer--;
+        if (e.rangerTimer <= 0 && d < 340) {
+          const a = Math.atan2(player.y-e.y, player.x-e.x);
+          enemyBullets.push(acquireEnemyBullet({ x:e.x, y:e.y, vx:Math.cos(a)*3.6, vy:Math.sin(a)*3.6, r:6, dmg:e.dmg*0.7 }));
+          e.rangerTimer = 100;
+        }
+        break;
+      }
+      case 'flanker': {
+        // 側翼型：繞著玩家旋轉並緩慢收縮半徑，試圖從側面／背後靠近包夾
+        const perpX = -dirY*e.flankDir, perpY = dirX*e.flankDir;
+        e.x += (perpX*0.85 + dirX*0.3) * e.speed;
+        e.y += (perpY*0.85 + dirY*0.3) * e.speed;
+        break;
+      }
+      case 'dasher': {
+        // 衝刺型：先短暫停頓蓄力（畫面上會出現警示光圈給玩家反應時間），再朝鎖定方向高速衝刺一段距離
+        e.dashTimer--;
+        if (e.dashState === 'dashing') {
+          e.x += e.dashDir.x * e.speed * 3.2;
+          e.y += e.dashDir.y * e.speed * 3.2;
+          if (e.dashTimer <= 0) { e.dashState = 'idle'; e.dashTimer = 70 + Math.random()*40; }
+        } else if (e.dashState === 'charging') {
+          if (e.dashTimer <= 0) { e.dashState = 'dashing'; e.dashDir = { x: dirX, y: dirY }; e.dashTimer = 18; }
+        } else {
+          e.x += dirX*e.speed*0.4; e.y += dirY*e.speed*0.4;
+          if (e.dashTimer <= 0 && d < 260) { e.dashState = 'charging'; e.dashTimer = 26; }
+        }
+        break;
+      }
+      default: { // chaser（含 boss）：原本的直線衝向玩家
+        if (d > 1) { e.x += dirX*e.speed; e.y += dirY*e.speed; }
+      }
+    }
+
+    if (d < player.r + e.r && player.invuln <= 0) {
+      player.hp -= e.dmg;
+      player.invuln = 24; // 受擊後約 0.4 秒無敵時間，避免被貼身瞬間清空血量
+      shakeT = 6;
+      sfx.hurt();
+      if (player.hp <= 0) { player.hp = 0; endGame(); }
+    }
+  }
+
+  // 空間網格分割：把目前所有敵人依座標塞進網格格子，下面的子彈碰撞查詢就只需要看子彈周圍幾格，
+  // 不必再把「每顆子彈」和「每個敵人」全部兩兩比對一次，敵人／子彈數量一多效能差異會很明顯
+  enemyGrid.clear();
+  for (const e of enemies) { enemyGrid.insert(e); e.hitThisFrame = false; }
+
+  // bullet-enemy collision：子彈只查詢自己周圍幾格內的敵人作碰撞比對
+  let anyKillThisFrame = false;
+  for (let j = bullets.length - 1; j >= 0; j--) {
+    const b = bullets[j];
+    const nearby = enemyGrid.query(b.x, b.y, b.r + MAX_ENEMY_R);
+    for (const e of nearby) {
+      if (e.hitThisFrame || e.dead) continue; // 同一敵人這一幀最多吃一次傷害，跟原本的邏輯一致
+      const bd = Math.hypot(b.x - e.x, b.y - e.y);
+      if (bd < b.r + e.r) {
+        if (b.type === 'boomerang') {
+          if (b.hitIds.has(e.id)) continue; // 這一趟（去程或回程）已經打過這隻，跳過避免每幀連續扣血
+          b.hitIds.add(e.id);
+        }
+        e.hp -= (b.dmg || 1);
+        e.hitT = 8;
+        e.hitThisFrame = true;
+        spawnParticles(b.x,b.y,e.color,4);
+        sfx.hit();
+        if (b.type === 'boomerang') {
+          // 迴力鏢不會因擊中而消失，去程與回程都能持續造成傷害
+        } else if (b.pierce && b.pierce > 0) {
+          b.pierce--;
+        } else {
+          releaseBullet(b);
+          bullets.splice(j,1);
+        }
+        if (e.hp <= 0) {
+          spawnShards(e.x,e.y,e.color,e.boss ? 22 : (e.tough ? 16 : 10));
+          score += e.tough ? 30 : 10;
+          kills++;
+          registerKillCombo();
+          sfx.kill();
+          e.dead = true;
+          anyKillThisFrame = true;
+        }
+        break;
+      }
+    }
+  }
+  // 統一在傷害結算後才移除死亡的敵人並歸還物件池，避免邊掃描邊刪除陣列造成漏判
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    if (enemies[i].dead) { releaseEnemy(enemies[i]); enemies.splice(i, 1); }
+  }
+  if (anyKillThisFrame) {
+    if (freeWorldMode) checkDiamondReward();
+    else if (kills >= lv.killTarget) { levelClear(); return; }
+  }
+
+  // enemy projectiles (魔王／遠程怪彈幕)
+  for (let i=enemyBullets.length-1;i>=0;i--) {
+    const eb = enemyBullets[i];
+    eb.x += eb.vx; eb.y += eb.vy;
+    if (eb.x<-20||eb.x>W+20||eb.y<-20||eb.y>H+20) { releaseEnemyBullet(eb); enemyBullets.splice(i,1); continue; }
+    const d = Math.hypot(eb.x-player.x, eb.y-player.y);
+    if (d < player.r + eb.r && player.invuln <= 0) {
+      player.hp -= eb.dmg;
+      player.invuln = 24;
+      shakeT = 6;
+      sfx.hurt();
+      spawnParticles(eb.x, eb.y, '#E2685A', 6);
+      releaseEnemyBullet(eb);
+      enemyBullets.splice(i,1);
+      if (player.hp <= 0) { player.hp = 0; endGame(); return; }
+    }
+  }
+
+  // beams (光束殘影淡出)
+  for (let i=beams.length-1;i>=0;i--) {
+    beams[i].life--;
+    if (beams[i].life <= 0) beams.splice(i,1);
+  }
+
+  // shield slams (護盾衝擊特效淡出)
+  for (let i=shieldSlams.length-1;i>=0;i--) {
+    shieldSlams[i].life--;
+    if (shieldSlams[i].life <= 0) shieldSlams.splice(i,1);
+  }
+
+  // particles
+  for (let i=particles.length-1;i>=0;i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy;
+    p.vx *= 0.95; p.vy *= 0.95;
+    if (p.shard) p.rot += p.rotSpeed;
+    p.life--;
+    if (p.life<=0) { releaseParticle(p); particles.splice(i,1); }
+  }
+
+  if (diamondPopup > 0) diamondPopup--;
+  if (comboPopupT > 0) comboPopupT--;
+  if (comboTimer > 0) { comboTimer--; if (comboTimer === 0) comboCount = 0; } // 超過連擊時限沒有新擊殺，連擊歸零
+  if (shakeT>0) shakeT--;
+  updateHUD();
+}
+
+function endGame() {
+  running = false;
+  gameOver = true;
+  sfx.over();
+  const primaryBtn = document.getElementById('primaryBtn');
+  if (freeWorldMode) {
+    document.getElementById('overTitle').textContent = '你在自由世界倒下了！';
+    document.getElementById('overDesc').innerHTML = `得到 ${score} 分，這趟共獲得 ${ICONS.diamond}${Math.round(lastDiamondScore / FREE_WORLD_DIAMOND_STEP)} 顆鑽石，稍後回來繼續探索吧！`;
+    primaryBtn.textContent = '重新進入自由世界';
+    primaryBtn.onclick = () => startFreeWorld();
+    document.getElementById('overlay').style.display = 'flex';
+    return;
+  }
+  const lv = LEVELS[currentLevel];
+  document.getElementById('overTitle').textContent = lv.boss ? '你被魔王擊敗了！' : '你被淘汰了！';
+  document.getElementById('overDesc').textContent = lv.boss
+    ? `在「${lv.name}」中倒下，得到 ${score} 分，再挑戰一次吧！`
+    : `第 ${currentLevel+1} 關「${lv.name}」擊殺 ${kills}/${lv.killTarget}，得到 ${score} 分`;
+  primaryBtn.textContent = '重試本關';
+  primaryBtn.onclick = () => startLevel(currentLevel);
+  document.getElementById('overlay').style.display = 'flex';
+}
+
+function levelClear() {
+  running = false;
+  sfx.clear();
+  const lv = LEVELS[currentLevel];
+  if (currentLevel >= unlockedLevel) unlockedLevel = Math.min(LEVELS.length - 1, currentLevel + 1);
+  const isLast = currentLevel === LEVELS.length - 1;
+  const coinsEarned = (lv.boss ? 300 : 20 + currentLevel * 10) + Math.floor(score / 10);
+  coins += coinsEarned;
+  saveProgress();
+  document.getElementById('overTitle').innerHTML = lv.boss ? `${ICONS.trophy} 魔王討伐成功！` : (isLast ? '全部關卡完成！' : '過關！');
+  document.getElementById('overDesc').innerHTML = lv.boss
+    ? `你擊敗了「${lv.name}」，得到 ${score} 分，獲得 ${ICONS.coin}${coinsEarned} 枚金幣`
+    : `第 ${currentLevel+1} 關「${lv.name}」完成，得到 ${score} 分，獲得 ${ICONS.coin}${coinsEarned} 枚金幣`;
+  const primaryBtn = document.getElementById('primaryBtn');
+  if (isLast) {
+    primaryBtn.textContent = '重玩本關';
+    primaryBtn.onclick = () => startLevel(currentLevel);
+  } else {
+    primaryBtn.textContent = '下一關';
+    primaryBtn.onclick = () => startLevel(currentLevel + 1);
+  }
+  document.getElementById('overlay').style.display = 'flex';
+  updateHUD();
+}
+
+// ---- Cartoon-style drawing helpers ----
+function drawSceneryItem(kind, x, y, size) {
+  // 自由世界背景裝飾：原本用 emoji 畫，改成手繪向量圖形，風格才會跟遊戲本體、UI Kit 一致
+  const r = size/2;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  if (kind === 'flower1' || kind === 'flower2') {
+    const petal = kind === 'flower1' ? '#F5A8C6' : '#FFD37A';
+    ctx.fillStyle = petal;
+    ctx.strokeStyle = '#24414A';
+    ctx.lineWidth = 1.4;
+    for (let i=0;i<5;i++) {
+      const a = (Math.PI*2/5)*i;
+      ctx.beginPath();
+      ctx.ellipse(Math.cos(a)*r*0.42, Math.sin(a)*r*0.42, r*0.34, r*0.22, a, 0, Math.PI*2);
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(0, 0, r*0.28, 0, Math.PI*2);
+    ctx.fillStyle = '#E5CB90';
+    ctx.fill(); ctx.stroke();
+  } else if (kind === 'clover') {
+    ctx.fillStyle = '#6FCB9F';
+    ctx.strokeStyle = '#24414A';
+    ctx.lineWidth = 1.4;
+    for (let i=0;i<3;i++) {
+      const a = (Math.PI*2/3)*i - Math.PI/2;
+      ctx.beginPath();
+      ctx.ellipse(Math.cos(a)*r*0.32, Math.sin(a)*r*0.32, r*0.32, r*0.24, a, 0, Math.PI*2);
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(0, r*0.2); ctx.lineTo(0, r*0.85);
+    ctx.stroke();
+  } else if (kind === 'treeRound') {
+    ctx.fillStyle = '#8A5A3B'; ctx.strokeStyle = '#24414A'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.roundRect(-r*0.09, r*0.1, r*0.18, r*0.55, r*0.08); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#3FAE7A';
+    ctx.beginPath(); ctx.arc(0, -r*0.25, r*0.55, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  } else if (kind === 'treePine') {
+    ctx.fillStyle = '#8A5A3B'; ctx.strokeStyle = '#24414A'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.roundRect(-r*0.08, r*0.25, r*0.16, r*0.4, r*0.06); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#2E9B6C';
+    for (let i=0;i<3;i++) {
+      const yy = -r*0.15 - i*r*0.28, ww = r*(0.55 - i*0.12);
+      ctx.beginPath();
+      ctx.moveTo(0, yy - r*0.32);
+      ctx.lineTo(ww, yy + r*0.16);
+      ctx.lineTo(-ww, yy + r*0.16);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+  } else if (kind === 'rock') {
+    ctx.fillStyle = '#B9AF98'; ctx.strokeStyle = '#24414A'; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(-r*0.5, r*0.3);
+    ctx.lineTo(-r*0.3, -r*0.35);
+    ctx.lineTo(r*0.15, -r*0.45);
+    ctx.lineTo(r*0.5, -r*0.05);
+    ctx.lineTo(r*0.4, r*0.35);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if (kind === 'sunflower') {
+    ctx.fillStyle = '#F4C430'; ctx.strokeStyle = '#24414A'; ctx.lineWidth = 1.4;
+    for (let i=0;i<8;i++) {
+      const a = (Math.PI*2/8)*i;
+      ctx.beginPath();
+      ctx.ellipse(Math.cos(a)*r*0.4, Math.sin(a)*r*0.4, r*0.28, r*0.16, a, 0, Math.PI*2);
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(0,0,r*0.3,0,Math.PI*2); ctx.fillStyle = '#6B4423'; ctx.fill(); ctx.stroke();
+  } else if (kind === 'mushroom') {
+    ctx.fillStyle = '#F2E7D0'; ctx.strokeStyle = '#24414A'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.roundRect(-r*0.14, 0, r*0.28, r*0.4, r*0.06); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#E2685A';
+    ctx.beginPath(); ctx.arc(0, -r*0.05, r*0.42, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-r*0.14, -r*0.22, r*0.08, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r*0.16, -r*0.15, r*0.07, 0, Math.PI*2); ctx.fill();
+  } else if (kind === 'cloud') {
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.strokeStyle = 'rgba(36,65,74,0.35)'; ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.arc(-r*0.3, r*0.05, r*0.3, 0, Math.PI*2);
+    ctx.arc(r*0.1, -r*0.1, r*0.38, 0, Math.PI*2);
+    ctx.arc(r*0.42, r*0.08, r*0.26, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawShadow(x, y, r) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(20,35,40,0.28)';
+  ctx.beginPath();
+  ctx.ellipse(x, y + r*0.78, r*0.85, r*0.32, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+function drawSpikeRing(x, y, r, color) {
+  // 精英怪的裝甲尖刺環：讓剪影跟一般雜兵一眼就能分辨，不用只靠顏色
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#24414A';
+  ctx.lineWidth = 2;
+  const spikes = 8;
+  for (let s=0; s<spikes; s++) {
+    const a = (Math.PI*2/spikes)*s;
+    const baseA = a - 0.16, tipA = a, endA = a + 0.16;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(baseA)*r*0.95, Math.sin(baseA)*r*0.95);
+    ctx.lineTo(Math.cos(tipA)*r*1.35, Math.sin(tipA)*r*1.35);
+    ctx.lineTo(Math.cos(endA)*r*0.95, Math.sin(endA)*r*0.95);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawCrown(x, y, r, color) {
+  // 魔王頭頂的皇冠剪影，跟一般怪物、精英怪一眼區隔開來
+  ctx.save();
+  ctx.translate(x, y - r*1.15);
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#24414A';
+  ctx.lineWidth = 2.5;
+  const w = r*1.1, h = r*0.55;
+  ctx.beginPath();
+  ctx.moveTo(-w, h*0.4);
+  ctx.lineTo(-w, -h*0.1);
+  ctx.lineTo(-w*0.5, h*0.35);
+  ctx.lineTo(0, -h);
+  ctx.lineTo(w*0.5, h*0.35);
+  ctx.lineTo(w, -h*0.1);
+  ctx.lineTo(w, h*0.4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+function drawBlob(x, y, r, fill, stroke) {
+  ctx.fillStyle = fill;
+  ctx.strokeStyle = stroke || '#24414A';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+  // glossy highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.beginPath();
+  ctx.arc(x - r*0.35, y - r*0.35, r*0.3, 0, Math.PI*2);
+  ctx.fill();
+}
+
+function drawEyes(x, y, r, angry) {
+  const off = r * 0.4;
+  ctx.fillStyle = '#24414A';
+  [-1, 1].forEach(s => {
+    ctx.beginPath();
+    ctx.arc(x + s*off, y - r*0.1, r*0.16, 0, Math.PI*2);
+    ctx.fill();
+  });
+  if (angry) {
+    ctx.strokeStyle = '#24414A';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(x - off - r*0.25, y - r*0.4);
+    ctx.lineTo(x - off + r*0.15, y - r*0.25);
+    ctx.moveTo(x + off + r*0.25, y - r*0.4);
+    ctx.lineTo(x + off - r*0.15, y - r*0.25);
+    ctx.stroke();
+  }
+}
+
+function draw() {
+  ctx.save();
+  if (shakeT>0) {
+    ctx.translate((Math.random()-0.5)*shakeT, (Math.random()-0.5)*shakeT);
+  }
+  ctx.clearRect(0,0,W,H);
+
+  if (freeWorldMode) {
+    ctx.translate(-camX, -camY);
+    // 自由世界：大片草地背景 + 隨機散佈的裝飾（照相機會跟著玩家捲動）
+    ctx.fillStyle = '#CDEAD8';
+    ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+    ctx.strokeStyle = 'rgba(36,65,74,0.06)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x=0;x<WORLD_W;x+=48) { ctx.moveTo(x,0); ctx.lineTo(x,WORLD_H); }
+    for (let y=0;y<WORLD_H;y+=48) { ctx.moveTo(0,y); ctx.lineTo(WORLD_W,y); }
+    ctx.stroke();
+    for (const s of scenery) {
+      drawSceneryItem(s.kind, s.x, s.y, s.size);
+    }
+  } else {
+    // soft cartoon floor tiles
+    ctx.strokeStyle = 'rgba(36,65,74,0.06)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x=0;x<W;x+=48) { ctx.moveTo(x,0); ctx.lineTo(x,H); }
+    for (let y=0;y<H;y+=48) { ctx.moveTo(0,y); ctx.lineTo(W,y); }
+    ctx.stroke();
+  }
+
+  // particles (confetti-style + death shards)
+  for (const p of particles) {
+    if (p.shard) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.life/(p.maxLife || 30));
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.strokeStyle = '#24414A';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, -p.size);
+      ctx.lineTo(p.size*0.85, p.size*0.7);
+      ctx.lineTo(-p.size*0.85, p.size*0.7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+    ctx.globalAlpha = Math.max(0, p.life/25);
+    ctx.fillStyle = p.color;
+    ctx.strokeStyle = '#24414A';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,3,0,Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // laser beams (激光光束殘影)
+  for (const bm of beams) {
+    // 品牌風格光束特效：從玩家端「細」逐漸擴散到打擊端「寬」，用梯形色塊呈現能量擴張感，
+    // 外層是主色＋墨線描邊（跟遊戲內其他圖形一致的 UI KIT 邊框語言），內層是縮小比例的白色核心。
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, bm.life/10);
+    const dx = bm.x2 - bm.x1, dy = bm.y2 - bm.y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy/len, ny = dx/len;
+    const wStart = bm.width * 0.2, wEnd = bm.width;
+    ctx.fillStyle = '#5BD6C4';
+    ctx.strokeStyle = '#24414A';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(bm.x1 + nx*wStart/2, bm.y1 + ny*wStart/2);
+    ctx.lineTo(bm.x2 + nx*wEnd/2, bm.y2 + ny*wEnd/2);
+    ctx.lineTo(bm.x2 - nx*wEnd/2, bm.y2 - ny*wEnd/2);
+    ctx.lineTo(bm.x1 - nx*wStart/2, bm.y1 - ny*wStart/2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    const wStart2 = wStart*0.4, wEnd2 = wEnd*0.4;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.moveTo(bm.x1 + nx*wStart2/2, bm.y1 + ny*wStart2/2);
+    ctx.lineTo(bm.x2 + nx*wEnd2/2, bm.y2 + ny*wEnd2/2);
+    ctx.lineTo(bm.x2 - nx*wEnd2/2, bm.y2 - ny*wEnd2/2);
+    ctx.lineTo(bm.x1 - nx*wStart2/2, bm.y1 - ny*wStart2/2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+
+  // 「裂地護盾」特效：衝擊波圓環由小放大，同時中央有一把劍跟著從小刀變成大寶劍、帶揮砍角度，
+  // 主色用 --grape（遊戲裡「特殊武器」的識別色），與雷射光束的青色明確做出區隔。
+  for (const s of shieldSlams) {
+    const t = 1 - s.life / s.maxLife; // 0→1 的展開進度
+    const alpha = Math.max(0, s.life / s.maxLife);
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.85;
+    ctx.strokeStyle = '#5C6FA6';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r * t, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = alpha * 0.22;
+    ctx.fillStyle = '#5C6FA6';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r * t, 0, Math.PI * 2);
+    ctx.fill();
+
+    const swordScale = 0.35 + t * 1.35; // 由小刀（0.35倍）成長到大寶劍（1.7倍）
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.ang + (t - 0.5) * 2.2); // 附帶揮砍弧度
+    ctx.scale(swordScale, swordScale);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#24414A';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.rect(-3.2, -30, 6.4, 26); // 劍身
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#E5CB90';
+    ctx.beginPath();
+    ctx.rect(-9, -4, 18, 5.5); // 護手
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#24414A';
+    ctx.beginPath();
+    ctx.rect(-2.6, 1.5, 5.2, 9); // 握把
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, 13, 3.2, 0, Math.PI * 2); // 劍柄尾端圓球
+    ctx.fillStyle = '#E5CB90';
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // boss health bar (畫面上方的魔王血條，加上圓角、漸層與皇冠徽章營造份量感)
+  const bossRef = enemies.find(e => e.boss);
+  if (bossRef) {
+    const badgeR = 15;
+    const barX = 20 + badgeR, barY = 34, barW = W - 40 - badgeR, barH = 16;
+    const pct = Math.max(0, bossRef.hp/bossRef.maxHp);
+    ctx.save();
+    // 血條底板
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.strokeStyle = '#24414A';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW, barH, barH/2);
+    ctx.fill();
+    ctx.stroke();
+    // 血量漸層填色
+    if (pct > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(barX, barY, barW, barH, barH/2);
+      ctx.clip();
+      const grad = ctx.createLinearGradient(barX, 0, barX+barW, 0);
+      if (bossRef.enraged) { grad.addColorStop(0, '#E2685A'); grad.addColorStop(1, '#FF9B6B'); }
+      else { grad.addColorStop(0, '#5C6FA6'); grad.addColorStop(1, '#8FA0DE'); }
+      ctx.fillStyle = grad;
+      ctx.fillRect(barX, barY, barW*pct, barH);
+      ctx.restore();
+    }
+    // 左端皇冠徽章
+    ctx.beginPath();
+    ctx.arc(20+badgeR, barY+barH/2, badgeR, 0, Math.PI*2);
+    ctx.fillStyle = bossRef.enraged ? '#E2685A' : '#E5CB90';
+    ctx.fill();
+    ctx.stroke();
+    // 徽章上的皇冠改用向量繪製（不再依賴系統 emoji 字型）
+    ctx.save();
+    ctx.translate(20+badgeR, barY+barH/2+1);
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#24414A';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-6, 3.5); ctx.lineTo(-6, -1);
+    ctx.lineTo(-3, 2); ctx.lineTo(0, -4);
+    ctx.lineTo(3, 2); ctx.lineTo(6, -1);
+    ctx.lineTo(6, 3.5); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+    // 標題文字
+    ctx.font = 'bold 11px "Baloo 2", sans-serif';
+    ctx.fillStyle = bossRef.enraged ? '#E2685A' : '#24414A';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText((bossRef.enraged ? '狂暴中！' : '混沌魔王') + '　' + Math.max(0, Math.ceil(bossRef.hp)) + '/' + bossRef.maxHp, barX+barW/2, barY-4);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+
+  // diamond reward popup (自由世界達到分數門檻時的提示)
+  if (diamondPopup > 0) {
+    const px = W/2 + (freeWorldMode ? camX : 0);
+    const py = 70 + (freeWorldMode ? camY : 0) - (70-diamondPopup)*0.6;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, diamondPopup/20);
+    ctx.font = 'bold 20px "Baloo 2", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#2E7D8C';
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 4;
+    const txt = `+${diamondPopupCount} 鑽石！`;
+    ctx.strokeText(txt, px, py);
+    ctx.fillText(txt, px, py);
+    ctx.textAlign = 'left';
+    // 鑽石改用向量繪製，畫在文字左側
+    const tw = ctx.measureText(txt).width;
+    ctx.save();
+    ctx.translate(px - tw/2 - 16, py - 6);
+    ctx.fillStyle = '#B7E4DD';
+    ctx.strokeStyle = '#24414A';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(0,-9); ctx.lineTo(8,-2); ctx.lineTo(0,10); ctx.lineTo(-8,-2); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+    ctx.restore();
+  }
+
+  // combo popup（每 5 連擊跳一次，數字越高顏色越熱烈，強化「保持進攻節奏」的爽感回饋）
+  if (comboPopupT > 0) {
+    const px = W/2 + (freeWorldMode ? camX : 0);
+    const py = 108 + (freeWorldMode ? camY : 0) - (46-comboPopupT)*0.9;
+    const hot = comboPopupCount >= 20 ? '#E2685A' : (comboPopupCount >= 10 ? '#8A6A2E' : '#458393');
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, comboPopupT/18);
+    const scale = 1 + Math.min(0.35, (46-comboPopupT)*0.01);
+    ctx.translate(px, py);
+    ctx.scale(scale, scale);
+    ctx.font = '800 24px "Baloo 2", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = hot;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 4.5;
+    const ctxt = `連擊 x${comboPopupCount}！`;
+    ctx.strokeText(ctxt, 0, 0);
+    ctx.fillText(ctxt, 0, 0);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+
+  for (const b of bullets) {
+    if (b.type === 'boomerang') {
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.rot || 0);
+      ctx.fillStyle = '#B565FF';
+      ctx.strokeStyle = '#24414A';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -b.r*1.4);
+      ctx.lineTo(b.r*0.5, 0);
+      ctx.lineTo(0, b.r*1.4);
+      ctx.lineTo(-b.r*0.5, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-b.r*1.4, 0);
+      ctx.lineTo(0, b.r*0.5);
+      ctx.lineTo(b.r*1.4, 0);
+      ctx.lineTo(0, -b.r*0.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+    ctx.fillStyle = '#E5CB90';
+    ctx.strokeStyle = '#24414A';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // enemy projectiles (魔王彈幕)
+  for (const eb of enemyBullets) {
+    ctx.fillStyle = '#E2685A';
+    ctx.strokeStyle = '#24414A';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(eb.x, eb.y, eb.r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // enemies
+  for (const e of enemies) {
+    drawShadow(e.x, e.y, e.r);
+    // 衝刺型蓄力警示：脈動光圈提示玩家「牠要衝過來了」，給玩家可視化的反應時間
+    if (e.aiType === 'dasher' && e.dashState === 'charging') {
+      ctx.save();
+      ctx.globalAlpha = 0.55 + 0.35*Math.sin(performance.now()/45);
+      ctx.strokeStyle = '#4D8DFF';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.r + 8, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (e.boss) {
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.rotate(performance.now()/450);
+      ctx.fillStyle = e.enraged ? 'rgba(226,104,90,0.35)' : 'rgba(92,111,166,0.3)';
+      ctx.beginPath();
+      const spikes = 10;
+      for (let s=0; s<spikes; s++) {
+        const sa = (Math.PI*2/spikes)*s;
+        const rad = s%2===0 ? e.r*1.55 : e.r*1.1;
+        const px = Math.cos(sa)*rad, py = Math.sin(sa)*rad;
+        if (s===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    // 受擊擠壓：命中瞬間橫向撐開、縱向壓扁，再彈回原狀，強化打擊感
+    const hitK = (e.hitT || 0) / 8;
+    const sx = 1 + hitK*0.22, sy = 1 - hitK*0.22;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.scale(sx, sy);
+    if (e.tough && !e.boss) drawSpikeRing(0, 0, e.r, '#7A3FBF');
+    if (e.boss) drawCrown(0, 0, e.r, e.enraged ? '#E2685A' : '#E5CB90');
+    drawBlob(0, 0, e.r, e.color);
+    drawEyes(0, 0, e.r, e.tough || e.boss);
+    if (hitK > 0) {
+      ctx.globalAlpha = hitK * 0.6;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(0, 0, e.r, 0, Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+    // hp bar
+    if (e.hp < e.maxHp && !e.boss) {
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = '#24414A';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(e.x-e.r, e.y-e.r-10, e.r*2, 5);
+      ctx.strokeRect(e.x-e.r, e.y-e.r-10, e.r*2, 5);
+      ctx.fillStyle = '#34A99D';
+      ctx.fillRect(e.x-e.r, e.y-e.r-10, e.r*2*(e.hp/e.maxHp), 5);
+    }
+  }
+
+  // player
+  drawShadow(player.x, player.y, player.r);
+  const recoilK = (player.recoil || 0) / 8;
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  if (player.invuln > 0 && Math.floor(player.invuln/4) % 2 === 0) ctx.globalAlpha = 0.4;
+  ctx.rotate(player.angle);
+  ctx.translate(-recoilK*6, 0); // 開火瞬間武器往後縮一下，模擬後座力
+  ctx.fillStyle = '#E5CB90';
+  ctx.strokeStyle = '#24414A';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.roundRect(0, -4, player.r+14, 8, 4);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  const equippedSkin = SKINS.find(s => s.id === equippedSkinId) || SKINS[0];
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  if (player.invuln > 0 && Math.floor(player.invuln/4) % 2 === 0) ctx.globalAlpha = 0.4;
+  ctx.scale(1 - recoilK*0.12, 1 + recoilK*0.12); // 身體隨開火輕微擠壓，強化打擊感
+  if (equippedSkin.glow) {
+    ctx.save();
+    ctx.globalAlpha *= 0.3 + 0.15*Math.sin(performance.now()/200);
+    ctx.fillStyle = equippedSkin.glow;
+    ctx.beginPath();
+    ctx.arc(0, 0, player.r*1.4, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+  drawBlob(0, 0, player.r, equippedSkin.body, equippedSkin.stroke);
+  drawEyes(0, 0, player.r, false);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+document.getElementById('selectBtn').addEventListener('click', showLevelSelect);
+document.getElementById('levelBtn').addEventListener('click', showLevelSelect);
+document.getElementById('shopBtn').addEventListener('click', showShop);
+
+// ---- 設定面板：搖桿/攻擊鍵大小與位置 ----
+const settingsPanel = document.getElementById('settingsPanel');
+const settingsBackdrop = document.getElementById('settingsBackdrop');
+const joySizeSlider = document.getElementById('joySizeSlider');
+const atkSizeSlider = document.getElementById('atkSizeSlider');
+const joySizeVal = document.getElementById('joySizeVal');
+const atkSizeVal = document.getElementById('atkSizeVal');
+const dragModeBtn = document.getElementById('dragModeBtn');
+dragModeBtn.innerHTML = ICONS.pin + ' 拖曳調整位置'; // 初始狀態的自訂圖示（取代原本的📍表情符號）
+let wasRunningBeforeSettings = false;
+
+function setDragMode(on) {
+  settingsMode = on;
+  joy.classList.toggle('dragMode', on);
+  atkPad.classList.toggle('dragMode', on);
+  dragModeBtn.classList.toggle('active', on);
+  dragModeBtn.innerHTML = on ? (ICONS.check + ' 完成拖曳') : (ICONS.pin + ' 拖曳調整位置');
+}
+function openSettingsPanel() {
+  wasRunningBeforeSettings = running; // 記住原本是不是正在遊戲中，關閉設定後才能正確恢復
+  running = false; // 調整期間先暫停遊戲，避免角色/敵人在背景亂跑
+  joySizeSlider.value = ctrlSettings.joySize;
+  atkSizeSlider.value = ctrlSettings.atkSize;
+  joySizeVal.textContent = ctrlSettings.joySize;
+  atkSizeVal.textContent = ctrlSettings.atkSize;
+  settingsBackdrop.style.display = 'block'; // 蓋住背景畫面/HUD，避免看起來雜亂
+  joy.classList.add('aboveDim');
+  atkPad.classList.add('aboveDim'); // 讓搖桿、攻擊鍵浮到遮罩上方，維持可見可拖曳
+  settingsPanel.style.display = 'flex';
+}
+function closeSettingsPanel() {
+  setDragMode(false);
+  settingsPanel.style.display = 'none';
+  settingsBackdrop.style.display = 'none';
+  joy.classList.remove('aboveDim');
+  atkPad.classList.remove('aboveDim');
+  running = wasRunningBeforeSettings; // 恢復成打開設定前的狀態，避免遊戲卡住不動
+}
+joySizeSlider.addEventListener('input', () => {
+  ctrlSettings.joySize = parseInt(joySizeSlider.value, 10);
+  joySizeVal.textContent = ctrlSettings.joySize;
+  applyCtrlSettings();
+});
+joySizeSlider.addEventListener('change', saveCtrlSettings);
+atkSizeSlider.addEventListener('input', () => {
+  ctrlSettings.atkSize = parseInt(atkSizeSlider.value, 10);
+  atkSizeVal.textContent = ctrlSettings.atkSize;
+  applyCtrlSettings();
+});
+atkSizeSlider.addEventListener('change', saveCtrlSettings);
+dragModeBtn.addEventListener('click', () => setDragMode(!settingsMode));
+document.getElementById('resetCtrlBtn').addEventListener('click', () => {
+  ctrlSettings = Object.assign({}, CTRL_DEFAULTS);
+  saveCtrlSettings();
+  applyCtrlSettings();
+  joySizeSlider.value = ctrlSettings.joySize;
+  atkSizeSlider.value = ctrlSettings.atkSize;
+  joySizeVal.textContent = ctrlSettings.joySize;
+  atkSizeVal.textContent = ctrlSettings.atkSize;
+});
+document.getElementById('doneCtrlBtn').addEventListener('click', closeSettingsPanel);
+document.getElementById('settingsBtn').addEventListener('click', openSettingsPanel);
+document.getElementById('openSettingsFromMenuBtn').addEventListener('click', openSettingsPanel);
+settingsBackdrop.addEventListener('click', closeSettingsPanel); // 點遮罩空白處＝點「完成」關閉
+
+loadCtrlSettings();
+applyCtrlSettings();
+document.getElementById('goShopBtn').addEventListener('click', showShop);
+document.getElementById('freeWorldBtn').addEventListener('click', startFreeWorld);
+document.getElementById('closeShopBtn').addEventListener('click', showLevelSelect);
+
+// 刪除存檔：清空雲端(window.storage)與本機(localStorage)兩種管道的資料，
+// 並把記憶體中的進度變數重設回初始值，最後刷新畫面讓玩家立即看到「歸零」的結果。
+document.getElementById('deleteSaveBtn').addEventListener('click', async () => {
+  const ok = confirm('確定要刪除存檔嗎？金幣、鑽石、關卡進度與武器都會重置，此動作無法復原。');
+  if (!ok) return;
+  if (useClaudeStorage) {
+    try { await window.storage.delete('progress', false); }
+    catch (e) { console.warn('刪除 Claude storage 存檔失敗：', e.message || e); }
+  }
+  try { localStorage.removeItem(LOCAL_STORAGE_KEY); }
+  catch (e) { console.warn('刪除本機存檔失敗：', e.message || e); }
+
+  applyProgressData({}); // 帶入空物件即可觸發 applyProgressData 內建的預設值
+  showLevelSelect();
+  alert('存檔已刪除，進度已重置。');
+});
+
+const tipEl = document.getElementById('tip');
+document.getElementById('helpBtn').addEventListener('click', () => { tipEl.style.display = 'flex'; });
+
+// 左上角的標題徽章：平常只是裝飾，但在自由世界裡點一下可以直接跳回「上一次在玩的關卡」，
+// 不用特地開選單再選一次；這一關會記住在存檔裡，重新整理網頁也不會忘記
+document.getElementById('logo').addEventListener('click', () => {
+  if (freeWorldMode) startLevel(lastLevel);
+});
+tipEl.addEventListener('click', () => { tipEl.style.display = 'none'; });
+
+async function init() {
+  await loadProgress();
+  startLevel(0);
+  showLevelSelect();
+  loop();
+}
+init();
+</script>
+</body>
+</html>
